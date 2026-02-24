@@ -1,6 +1,6 @@
 ---
 # DevSec Postgres Baseline: https://dev-sec.io/baselines/postgres/
-# Run config and permissions: ansible-playbook postgres/main.yml
+# Run config and permissions: ansible-playbook playbooks/services/postgres/main.yml
 
 - import_playbook: config.yml
 - import_playbook: permissions.yml

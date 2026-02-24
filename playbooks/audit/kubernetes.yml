@@ -1,6 +1,6 @@
 ---
 # DevSec Kubernetes Configuration Audit
-# Run when K8s cluster nodes: ansible-playbook kubernetes/audit.yml
+# Run: ansible-playbook playbooks/audit/kubernetes.yml
 
 - name: DevSec Kubernetes Configuration Audit
   hosts: all
@@ -24,7 +24,7 @@
         path: /etc/kubernetes
       register: k8s_dir
 
-    - name: Verify manifest files are root:root and 644 (CIS 1.1.1-1.1.8)
+    - name: Verify manifest files are root:root (CIS 1.1.1-1.1.8)
       stat:
         path: "{{ item }}"
       register: manifest_stats
@@ -40,7 +40,7 @@
       loop: "{{ manifest_stats.results }}"
       when: item.stat is defined and item.stat.exists | default(false)
 
-    - name: Verify kubeconfig files are root:root and 644 (CIS 1.1.13-1.1.18)
+    - name: Verify kubeconfig files are root:root (CIS 1.1.13-1.1.18)
       stat:
         path: "{{ item }}"
       register: conf_stats

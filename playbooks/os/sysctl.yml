@@ -6,7 +6,7 @@
   hosts: all
   become: yes
   vars:
-    sysctl_forwarding: false  # Set true for routers/gateways
+    sysctl_forwarding: false
 
   tasks:
     - name: Configure sysctl network hardening

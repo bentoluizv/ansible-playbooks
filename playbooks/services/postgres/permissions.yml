@@ -1,19 +1,10 @@
 ---
 # DevSec Postgres Baseline: https://dev-sec.io/baselines/postgres/
-# Configures postgresql.conf and pg_hba.conf hardening
-# Run when PostgreSQL is used: ansible-playbook postgres/config.yml
+# Sets CIS-compliant permissions (postgres-10, postgres-20)
 
-- name: Harden PostgreSQL configuration (DevSec)
+- name: Set PostgreSQL file permissions (DevSec)
   hosts: all
   become: yes
-  vars:
-    postgres_ssl_enable: false
-
-  handlers:
-    - name: Restart PostgreSQL
-      systemd:
-        name: postgresql
-        state: restarted
 
   tasks:
     - name: Check if PostgreSQL is installed
@@ -36,30 +27,39 @@
         - pg_check.rc == 0
         - (pg_conf_find.files | default([]) | length) > 0
 
-    - name: Ensure conf.d exists
+    - name: Set config directory permissions (postgres-10)
       file:
-        path: "{{ postgres_conf_dir }}/conf.d"
+        path: "{{ postgres_conf_dir }}"
         state: directory
         owner: postgres
         group: postgres
         mode: '0700'
       when: postgres_conf_dir is defined
 
-    - name: Deploy hardening config (postgres-07, postgres-16)
-      template:
-        src: postgresql-hardening.conf.j2
-        dest: "{{ postgres_conf_dir }}/conf.d/99-hardening.conf"
+    - name: Set postgresql.conf permissions (postgres-10)
+      file:
+        path: "{{ postgres_conf_dir }}/postgresql.conf"
         owner: postgres
         group: postgres
-        mode: '0600'
+        mode: '0640'
       when: postgres_conf_dir is defined
-      notify: Restart PostgreSQL
+      failed_when: false
 
-    - name: Ensure include_dir is set in postgresql.conf
-      lineinfile:
-        path: "{{ postgres_conf_dir }}/postgresql.conf"
-        regexp: "^\s*#?\s*include_dir\s*="
-        line: "include_dir = 'conf.d'"
-        insertafter: "^data_directory"
+    - name: Set pg_hba.conf permissions (postgres-10)
+      file:
+        path: "{{ postgres_conf_dir }}/pg_hba.conf"
+        owner: postgres
+        group: postgres
+        mode: '0640'
       when: postgres_conf_dir is defined
-      notify: Restart PostgreSQL
+      failed_when: false
+
+    - name: Set log directory permissions (postgres-20)
+      file:
+        path: /var/log/postgresql
+        state: directory
+        owner: postgres
+        group: postgres
+        mode: '0700'
+      when: pg_check.rc == 0
+      failed_when: false

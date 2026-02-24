@@ -1,6 +1,6 @@
 ---
 # DevSec Nginx Baseline Audit: https://dev-sec.io/baselines/nginx/
-# Run when nginx is used: ansible-playbook nginx/audit.yml
+# Run: ansible-playbook playbooks/audit/nginx.yml
 
 - name: DevSec Nginx Configuration Audit
   hosts: all
@@ -19,7 +19,7 @@
       register: nginx_conf_stat
       when: nginx_check.rc == 0
 
-    - name: Assert nginx.conf is root:root and not world-readable (nginx-02)
+    - name: Assert nginx.conf is root:root (nginx-02)
       assert:
         that:
           - nginx_conf_stat.stat.uid == 0

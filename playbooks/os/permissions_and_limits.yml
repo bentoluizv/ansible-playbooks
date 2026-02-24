@@ -1,24 +1,17 @@
 ---
 # Ubuntu equivalent of: https://github.com/trimstray/the-practical-linux-hardening-guide/wiki/Permissions-and-Limits
 # DevSec Linux Baseline: https://dev-sec.io/baselines/linux/
-# Covers: Verify permissions, Restrict filesystems, Restrict programs
 
 - name: Permissions and Limits (Ubuntu Hardening)
   hosts: all
   become: yes
   tasks:
-    # ==========================================================================
-    # Verify permissions (C2S/CIS)
-    # Restrictive permissions for security-critical files
-    # ==========================================================================
-
     - name: Set /etc/passwd permissions and ownership
       file:
         path: /etc/passwd
         mode: '0644'
         owner: root
         group: root
-      # CCE-26949-8, CCE-26887-0, CCE-27138-7, CCE-26639-5
 
     - name: Set /etc/group permissions and ownership
       file:
@@ -26,7 +19,6 @@
         mode: '0644'
         owner: root
         group: root
-      # CCE-26933-2, CCE-27037-1
 
     - name: Set /etc/shadow permissions and ownership
       file:
@@ -34,8 +26,6 @@
         mode: '0640'
         owner: root
         group: shadow
-      # CCE-27100-7, CCE-26795-5, CCE-27125-4
-      # Note: Ubuntu uses 'shadow' group for /etc/shadow (not root)
 
     - name: Set /etc/gshadow permissions and ownership
       file:
@@ -43,9 +33,7 @@
         mode: '0000'
         owner: root
         group: root
-      # CCE-27162-7, CCE-27161-9, CCE-26840-9
 
-    # DevSec os-11: Protect log directory
     - name: Set /var/log ownership (DevSec os-11)
       file:
         path: /var/log
@@ -53,7 +41,6 @@
         group: root
         state: directory
 
-    # DevSec os-13: Protect cron directories
     - name: Set cron files and directories ownership (DevSec os-13)
       file:
         path: "{{ item }}"
@@ -80,12 +67,6 @@
         - { path: /etc/cron.monthly, mode: '0700' }
         - { path: /etc/cron.d, mode: '0700' }
       ignore_errors: true
-
-    # ==========================================================================
-    # Restrict filesystems (C2S/CIS, DevSec os-10)
-    # DevSec expects /etc/modprobe.d/dev-sec.conf
-    # Note: vfat excluded if EFI; squashfs excluded if snapd (Ubuntu snaps)
-    # ==========================================================================
 
     - name: Check if EFI and snapd (for conditional blacklist)
       block:
@@ -120,7 +101,7 @@
         content: "{{ fs_blacklist }}"
         mode: '0644'
 
-    - name: Remove legacy fs-blacklist.conf (consolidated to dev-sec.conf)
+    - name: Remove legacy fs-blacklist.conf
       file:
         path: /etc/modprobe.d/fs-blacklist.conf
         state: absent
@@ -130,12 +111,6 @@
         name: autofs.service
         enabled: false
       failed_when: false
-      # CCE-27498-5 (Medium)
-
-    # ==========================================================================
-    # Restrict programs (C2S/CIS)
-    # Disable core dumps, enable ASLR
-    # ==========================================================================
 
     - name: Configure sysctl hardening
       copy:
@@ -164,4 +139,3 @@
         regexp: '^\s*\*\s+hard\s+core\s+'
         line: '*     hard   core    0'
         insertafter: EOF
-      # CCE-26900-1, CCE-80169-6

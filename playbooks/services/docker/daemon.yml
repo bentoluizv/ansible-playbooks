@@ -1,7 +1,6 @@
 ---
 # DevSec Docker Baseline: https://dev-sec.io/baselines/docker/
 # CIS Docker Benchmark: https://github.com/dev-sec/cis-docker-benchmark
-# Run when Docker is used: ansible-playbook docker/daemon.yml
 
 - name: Configure Docker daemon (DevSec/CIS)
   hosts: all

@@ -1,10 +1,15 @@
 ---
-- import_playbook: ansible_user.yml
-- import_playbook: ssh.yml
-- import_playbook: maintaining_software.yml
-- import_playbook: permissions_and_limits.yml
-- import_playbook: pam.yml
-- import_playbook: apparmor.yml
-- import_playbook: auditd.yml
-- import_playbook: sysctl.yml
-- import_playbook: kubernetes/kubectl.yml
+# OS hardening
+- import_playbook: playbooks/os/ansible_user.yml
+- import_playbook: playbooks/os/ssh.yml
+- import_playbook: playbooks/os/maintaining_software.yml
+- import_playbook: playbooks/os/permissions_and_limits.yml
+- import_playbook: playbooks/os/pam.yml
+- import_playbook: playbooks/os/apparmor.yml
+- import_playbook: playbooks/os/auditd.yml
+- import_playbook: playbooks/os/sysctl.yml
+
+# Kubernetes specific
+- import_playbook: playbooks/services/kubernetes/kubectl.yml
+- import_playbook: playbooks/services/kubernetes/permissions.yml
+

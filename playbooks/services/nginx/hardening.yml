@@ -1,7 +1,6 @@
 ---
 # DevSec Nginx Baseline: https://dev-sec.io/baselines/nginx/
 # Buffer limits, timeouts, security headers, remove default site
-# Run when nginx is used: ansible-playbook nginx/hardening.yml
 
 - name: Harden nginx configuration (DevSec)
   hosts: all

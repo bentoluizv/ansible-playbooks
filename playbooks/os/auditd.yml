@@ -6,7 +6,6 @@
   hosts: all
   become: yes
   vars:
-    # DevSec package-08 alignment
     auditd_max_log_file: 8
     auditd_action_mail_acct: root
     auditd_space_left: 75
@@ -18,17 +17,11 @@
     auditd_disk_error_action: SUSPEND
 
   tasks:
-    # ==========================================================================
-    # Install auditd
-    # ==========================================================================
     - name: Install auditd
       apt:
         name: auditd
         state: present
 
-    # ==========================================================================
-    # Enable auditing for processes before audit daemon (CCE-27212-0)
-    # ==========================================================================
     - name: Ensure audit=1 in GRUB_CMDLINE_LINUX
       replace:
         path: /etc/default/grub
@@ -40,18 +33,12 @@
       command: update-grub
       when: grub_audit_change is changed
 
-    # ==========================================================================
-    # Enable auditd service (CCE-27407-6)
-    # ==========================================================================
     - name: Enable and start auditd
       systemd:
         name: auditd
         enabled: true
         state: started
 
-    # ==========================================================================
-    # auditd.conf settings (DevSec package-08)
-    # ==========================================================================
     - name: Configure auditd
       lineinfile:
         path: /etc/audit/auditd.conf
@@ -70,9 +57,6 @@
       loop_control:
         label: "{{ item.key }}"
 
-    # ==========================================================================
-    # Deploy audit rules
-    # ==========================================================================
     - name: Deploy audit hardening rules
       copy:
         src: auditd/99-hardening.rules

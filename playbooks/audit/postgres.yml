@@ -1,6 +1,6 @@
 ---
 # DevSec Postgres Baseline Audit: https://dev-sec.io/baselines/postgres/
-# Run when PostgreSQL is used: ansible-playbook postgres/audit.yml
+# Run: ansible-playbook playbooks/audit/postgres.yml
 
 - name: DevSec PostgreSQL Configuration Audit
   hosts: all

@@ -1,16 +1,12 @@
 ---
 # Ubuntu equivalent of: https://github.com/trimstray/the-practical-linux-hardening-guide/wiki/SELinux
 # Ubuntu uses AppArmor (not SELinux) as its mandatory access control system
-# Covers: Enforcing mode, Boot config, Unconfined processes, Unnecessary packages
 
 - name: AppArmor (Ubuntu MAC Hardening)
   hosts: all
   become: yes
 
   tasks:
-    # ==========================================================================
-    # Ensure AppArmor state is enforcing (CCE-27334-2 equivalent)
-    # ==========================================================================
     - name: Ensure AppArmor service is enabled and started
       systemd:
         name: apparmor
@@ -23,12 +19,8 @@
         executable: /bin/bash
       changed_when: true
       failed_when: false
-      # Transitions complain/disabled profiles to enforce
 
-    # ==========================================================================
-    # Ensure AppArmor not disabled in grub (CCE-26961-3 equivalent)
-    # ==========================================================================
-    - name: Remove apparmor=0 from GRUB (disabling parameter)
+    - name: Remove apparmor=0 from GRUB
       replace:
         path: /etc/default/grub
         regexp: '\s*apparmor=0\s*'
@@ -39,10 +31,6 @@
       command: update-grub
       when: grub_apparmor_remove is changed
 
-    # ==========================================================================
-    # Ensure no critical processes unconfined (CCE-27288-0 equivalent)
-    # AppArmor: check for profiles in complain mode or unconfined
-    # ==========================================================================
     - name: Check AppArmor status for unconfined/complain profiles
       command: apparmor_status
       register: apparmor_status
@@ -56,4 +44,3 @@
           Consider: aa-enforce /etc/apparmor.d/<profile>
           {{ apparmor_status.stdout | default('') }}
       when: "'complain' in (apparmor_status.stdout | default(''))"
-

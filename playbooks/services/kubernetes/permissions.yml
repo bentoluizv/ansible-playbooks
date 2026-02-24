@@ -1,8 +1,6 @@
 ---
 # DevSec Kubernetes Baseline: https://dev-sec.io/baselines/kubernetes/
-# CIS Kubernetes Benchmark: https://github.com/dev-sec/cis-kubernetes-benchmark
-# Sets CIS-compliant permissions on kubeadm cluster config files
-# Run when K8s cluster nodes: ansible-playbook kubernetes/permissions.yml
+# CIS Kubernetes Benchmark - Sets CIS-compliant permissions on kubeadm cluster config files
 
 - name: Set Kubernetes config file permissions (CIS)
   hosts: all

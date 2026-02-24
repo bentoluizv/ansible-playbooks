@@ -6,8 +6,6 @@
   hosts: all
   become: yes
   vars:
-    # Services to disable (C2S/CIS - reduce attack surface)
-    # Only disables if the service exists; safe to list all
     services_to_disable:
       - rlogin.socket
       - rexec.socket
@@ -31,10 +29,6 @@
       - cups-browsed.service
 
   tasks:
-    # ==========================================================================
-    # Package signatures (C2S/CIS CCE-26989-4)
-    # APT verifies packages by default; ensure no insecure overrides
-    # ==========================================================================
     - name: Configure APT security hardening (no insecure repos)
       copy:
         dest: /etc/apt/apt.conf.d/99-security-hardening
@@ -44,9 +38,6 @@
           APT::Get::AllowUnauthenticated "false";
         mode: '0644'
 
-    # ==========================================================================
-    # Keep system updated (C2S/CIS CCE-26895-3)
-    # ==========================================================================
     - name: Update apt cache
       apt:
         update_cache: true
@@ -58,12 +49,6 @@
         autoremove: true
         autoclean: true
 
-    # ==========================================================================
-    # Disable vulnerable software (C2S/CIS)
-    # Remove/disable legacy unencrypted and unnecessary services
-    # ==========================================================================
-
-    # Remove legacy R-services (rsh, rlogin, rcp - unencrypted)
     - name: Remove rsh and related legacy clients
       apt:
         name:
@@ -72,7 +57,6 @@
           - netkit-rsh
         state: absent
 
-    # Remove trust files used with R-services
     - name: Remove R-services trust files
       file:
         path: "{{ item }}"
@@ -82,7 +66,6 @@
         - /root/.rhosts
       ignore_errors: true
 
-    # Remove other vulnerable/unnecessary packages (DevSec package-09: prelink)
     - name: Remove vulnerable and unnecessary packages
       apt:
         name:
@@ -102,7 +85,6 @@
           - prelink
         state: absent
 
-    # Disable services (only if they exist)
     - name: Disable unnecessary network services
       systemd:
         name: "{{ item }}"
@@ -110,20 +92,13 @@
         daemon_reload: true
       loop: "{{ services_to_disable }}"
       ignore_errors: true
-      register: disable_services
       failed_when: false
 
-    # ==========================================================================
-    # Enable important software (C2S/CIS)
-    # ==========================================================================
-
-    # TCP Wrappers for access control (C2S/CIS CCE-27361-5)
     - name: Install TCP Wrappers
       apt:
         name: tcpd
         state: present
 
-    # Cron for maintenance tasks (C2S/CIS CCE-27323-5)
     - name: Ensure cron is installed and enabled
       apt:
         name: cron
@@ -135,8 +110,6 @@
         enabled: true
         state: started
 
-    # Time synchronization (C2S/CIS CCE-27444-9)
-    # Ubuntu uses systemd-timesyncd by default; chrony is an alternative
     - name: Ensure time synchronization is enabled
       block:
         - name: Install chrony for NTP

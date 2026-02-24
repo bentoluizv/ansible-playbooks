@@ -1,6 +1,6 @@
 ---
 # DevSec Docker Configuration Audit
-# Run when Docker is used: ansible-playbook docker/audit.yml
+# Run: ansible-playbook playbooks/audit/docker.yml
 
 - name: DevSec Docker Configuration Audit
   hosts: all
@@ -18,7 +18,7 @@
         path: /etc/docker/daemon.json
       register: daemon_json
 
-    - name: Verify icc is false (CIS 2.1 - restrict inter-container traffic)
+    - name: Verify icc is false (CIS 2.1)
       command: grep -q '"icc":\s*false' /etc/docker/daemon.json
       register: docker_icc
       changed_when: false

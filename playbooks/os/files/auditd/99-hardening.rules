@@ -49,7 +49,7 @@
 -w /etc/sudoers -p wa -k actions
 -w /etc/sudoers.d/ -p wa -k actions
 
-## Network environment (Ubuntu: skip /etc/sysconfig/network)
+## Network environment
 -a always,exit -F arch=b32 -S sethostname,setdomainname -F key=audit_rules_networkconfig_modification
 -a always,exit -F arch=b64 -S sethostname,setdomainname -F key=audit_rules_networkconfig_modification
 -w /etc/issue -p wa -k audit_rules_networkconfig_modification

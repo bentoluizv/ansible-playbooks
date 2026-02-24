@@ -1,8 +1,6 @@
 ---
 # DevSec SSL Baseline: https://dev-sec.io/baselines/ssl/
-# Mozilla TLS: https://ssl-config.mozilla.org/
 # Configures TLS for nginx (TLS 1.2+, ECDHE ciphers, ROBOT mitigation)
-# Run when nginx is used: ansible-playbook nginx/ssl.yml
 
 - name: Configure TLS for nginx (DevSec SSL)
   hosts: all

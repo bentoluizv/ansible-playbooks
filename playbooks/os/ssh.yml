@@ -15,8 +15,13 @@
     sshd_kexs: 'curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group-exchange-sha256,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512'
     sshd_macs: 'hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-512,hmac-sha2-256'
 
+  handlers:
+    - name: Restart SSH service
+      service:
+        name: ssh
+        state: restarted
+
   tasks:
-    # sshd-04/05: File permissions
     - name: Set /etc/ssh directory permissions (DevSec sshd-04)
       file:
         path: /etc/ssh
@@ -32,7 +37,6 @@
         group: root
         mode: '0600'
 
-    # sshd-01/02/03: Crypto
     - name: Set SSH ciphers (DevSec sshd-01)
       lineinfile:
         path: /etc/ssh/sshd_config
@@ -54,7 +58,6 @@
         line: 'MACs {{ sshd_macs }}'
       notify: Restart SSH service
 
-    # sshd-06/07/08/09
     - name: Set Protocol 2 (DevSec sshd-10)
       lineinfile:
         path: /etc/ssh/sshd_config
@@ -83,7 +86,6 @@
         line: 'ListenAddress 0.0.0.0'
       notify: Restart SSH service
 
-    # sshd-11/12/13
     - name: Enable StrictModes (DevSec sshd-11)
       lineinfile:
         path: /etc/ssh/sshd_config
@@ -105,7 +107,6 @@
         line: 'LogLevel VERBOSE'
       notify: Restart SSH service
 
-    # sshd-17/18/19/20/21
     - name: Disable PermitUserEnvironment (DevSec sshd-17)
       lineinfile:
         path: /etc/ssh/sshd_config
@@ -141,7 +142,6 @@
         line: 'MaxStartups 10:30:60'
       notify: Restart SSH service
 
-    # sshd-22/23/24/25
     - name: Enable PubkeyAuthentication (DevSec sshd-22)
       lineinfile:
         path: /etc/ssh/sshd_config
@@ -170,7 +170,6 @@
         line: 'HostbasedAuthentication no'
       notify: Restart SSH service
 
-    # sshd-27/28/29
     - name: Disable PasswordAuthentication (DevSec sshd-27)
       lineinfile:
         path: /etc/ssh/sshd_config
@@ -192,7 +191,6 @@
         line: 'ChallengeResponseAuthentication no'
       notify: Restart SSH service
 
-    # sshd-30/31/32/33/34
     - name: Disable Kerberos (DevSec sshd-30/31/32)
       lineinfile:
         path: /etc/ssh/sshd_config
@@ -220,7 +218,6 @@
         - { key: 'GSSAPICleanupCredentials', value: 'yes' }
       notify: Restart SSH service
 
-    # sshd-35/36/37
     - name: Disable TCPKeepAlive (DevSec sshd-35)
       lineinfile:
         path: /etc/ssh/sshd_config
@@ -242,7 +239,6 @@
         line: 'ClientAliveCountMax 3'
       notify: Restart SSH service
 
-    # sshd-38/39/40/41
     - name: Disable tunnels and forwarding (DevSec sshd-38/39/40/41)
       lineinfile:
         path: /etc/ssh/sshd_config
@@ -255,7 +251,6 @@
         - { key: 'GatewayPorts', value: 'no' }
       notify: Restart SSH service
 
-    # sshd-42/43/44/45/46/47
     - name: Configure X11, Motd, Banner (DevSec sshd-42/43/44/45/46)
       lineinfile:
         path: /etc/ssh/sshd_config
@@ -282,9 +277,3 @@
         regexp: '^#?PermitRootLogin'
         line: 'PermitRootLogin no'
       notify: Restart SSH service
-
-  handlers:
-    - name: Restart SSH service
-      service:
-        name: ssh
-        state: restarted

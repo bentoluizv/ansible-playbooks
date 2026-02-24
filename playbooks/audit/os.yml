@@ -1,14 +1,12 @@
 ---
-# Security audits (filesystem scans can be slow)
-# Run separately: ansible-playbook audit.yml
-# DevSec Linux Baseline: https://dev-sec.io/baselines/linux/
+# DevSec Linux Baseline - OS audits
+# Run: ansible-playbook playbooks/audit/os.yml
 
 - name: DevSec OS Audits
   hosts: all
   become: yes
 
   tasks:
-    # DevSec os-09: No .rhosts or .netrc files
     - name: Check for .rhosts and .netrc files (DevSec os-09)
       command: find / -maxdepth 3 \( -iname .rhosts -o -iname .netrc \) -print 2>/dev/null
       register: rhosts_netrc
@@ -21,7 +19,6 @@
         msg: "DevSec os-09: Found .rhosts or .netrc - {{ rhosts_netrc.stdout_lines | default([]) }}"
       when: (rhosts_netrc.stdout_lines | default([]) | length) > 0
 
-    # DevSec os-07: Unique UID/GID
     - name: Check for duplicate UIDs (DevSec os-07)
       shell: "awk -F: '{print $3}' /etc/passwd | sort -n | uniq -d"
       register: dup_uids
@@ -36,7 +33,6 @@
       failed_when: dup_gids.stdout | length > 0
       ignore_errors: true
 
-    # DevSec os-10: dev-sec.conf exists
     - name: Verify dev-sec.conf filesystem blacklist (DevSec os-10)
       command: grep -q 'install cramfs /bin/true' /etc/modprobe.d/dev-sec.conf
       register: devsec_conf_check
@@ -118,7 +114,6 @@
   become: yes
 
   tasks:
-    # CCE-80134-0, CCE-80135-7
     - name: Check for files not owned by any user
       command: find / -xdev -nouser 2>/dev/null
       register: unowned_files
@@ -128,7 +123,7 @@
 
     - name: Alert on unowned files
       debug:
-        msg: "Security: Found {{ unowned_files.stdout_lines | default([]) | length }} file(s) not owned by any user. Investigate: find / -xdev -nouser"
+        msg: "Security: Found {{ unowned_files.stdout_lines | default([]) | length }} file(s) not owned by any user."
       when: (unowned_files.stdout_lines | default([]) | length) > 0
 
     - name: Check for files not owned by any group
@@ -140,10 +135,9 @@
 
     - name: Alert on ungrouped files
       debug:
-        msg: "Security: Found {{ ungrouped_files.stdout_lines | default([]) | length }} file(s) not owned by any group. Investigate: find / -xdev -nogroup"
+        msg: "Security: Found {{ ungrouped_files.stdout_lines | default([]) | length }} file(s) not owned by any group."
       when: (ungrouped_files.stdout_lines | default([]) | length) > 0
 
-    # CCE-80131-6
     - name: Check for world-writable files
       command: find / -xdev -perm -o+w -type f 2>/dev/null
       register: world_writable_files
@@ -153,10 +147,9 @@
 
     - name: Alert on world-writable files
       debug:
-        msg: "Security: Found {{ world_writable_files.stdout_lines | default([]) | length }} world-writable file(s). Investigate: find / -xdev -perm -o+w -type f"
+        msg: "Security: Found {{ world_writable_files.stdout_lines | default([]) | length }} world-writable file(s)."
       when: (world_writable_files.stdout_lines | default([]) | length) > 0
 
-    # CCE-80130-8 - fix world-writable dirs without sticky bit
     - name: Find world-writable directories without sticky bit
       shell: |
         df --local -P | awk 'NR!=1 {print $6}' | xargs -I '{}' find '{}' -xdev -type d \( -perm -0002 -a ! -perm -1000 \) 2>/dev/null
