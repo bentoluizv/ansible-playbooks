@@ -13,12 +13,16 @@
         enabled: true
         state: started
 
+    - name: Check for AppArmor profiles in complain mode
+      command: apparmor_status
+      register: apparmor_complain_check
+      changed_when: false
+
     - name: Set all AppArmor profiles to enforcing mode
       shell: aa-enforce /etc/apparmor.d/*
       args:
         executable: /bin/bash
-      changed_when: true
-      failed_when: false
+      changed_when: "'complain' in (apparmor_complain_check.stdout | default(''))"
 
     - name: Remove apparmor=0 from GRUB
       replace:
