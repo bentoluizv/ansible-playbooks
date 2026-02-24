@@ -1,0 +1,115 @@
+---
+- name: Harden SSH Configuration
+  hosts: all
+  become: yes
+  tasks:
+    - name: Ensure SSH protocol version 2
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?Protocol'
+        line: 'Protocol 2'
+      notify: Restart SSH service
+
+    - name: Disable empty passwords
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PermitEmptyPasswords'
+        line: 'PermitEmptyPasswords no'
+      notify: Restart SSH service
+
+    - name: Set SSH client alive count max
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?ClientAliveCountMax'
+        line: 'ClientAliveCountMax 0'
+      notify: Restart SSH service
+
+    - name: Set SSH client alive interval
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?ClientAliveInterval'
+        line: 'ClientAliveInterval 300'
+      notify: Restart SSH service
+
+    - name: Set SSH warning banner
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?Banner'
+        line: 'Banner /etc/issue'
+      notify: Restart SSH service
+
+    - name: Set SSH MAC algorithms
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?MACs'
+        line: 'MACs hmac-sha2-512,hmac-sha2-256,hmac-sha1'
+      notify: Restart SSH service
+
+    - name: Disable SSH user environment options
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PermitUserEnvironment'
+        line: 'PermitUserEnvironment no'
+      notify: Restart SSH service
+
+    - name: Ignore .rhosts files
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?IgnoreRhosts'
+        line: 'IgnoreRhosts yes'
+      notify: Restart SSH service
+
+    - name: Set SSH log level
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?LogLevel'
+        line: 'LogLevel INFO'
+      notify: Restart SSH service
+
+    - name: Set validated SSH ciphers
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?Ciphers'
+        line: 'Ciphers aes128-ctr,aes192-ctr,aes256-ctr,aes128-cbc,3des-cbc,aes192-cbc,aes256-cbc'
+      notify: Restart SSH service
+
+    - name: Enable encrypted X11 forwarding
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?X11Forwarding'
+        line: 'X11Forwarding yes'
+      notify: Restart SSH service
+
+    - name: Disable host-based authentication
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?HostbasedAuthentication'
+        line: 'HostbasedAuthentication no'
+      notify: Restart SSH service
+
+    - name: Limit SSH authentication attempts
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?MaxAuthTries'
+        line: 'MaxAuthTries 4'
+      notify: Restart SSH service
+
+    - name: Disable Root Login via SSH
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PermitRootLogin'
+        line: 'PermitRootLogin no'
+      notify: Restart SSH service
+
+    - name: Disable Password Authentication
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PasswordAuthentication'
+        line: 'PasswordAuthentication no'
+      notify: Restart SSH service
+
+  handlers:
+    - name: Restart SSH service
+      service:
+        name: ssh
+        state: restarted

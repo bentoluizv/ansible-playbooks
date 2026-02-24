@@ -1,0 +1,4 @@
+---
+- import_playbook: ansible_user.yml
+- import_playbook: ssh.yml
+- import_playbook: kubectl.yml

@@ -1,0 +1,33 @@
+---
+- name: Setup Dedicated Ansible User
+  hosts: all
+  become: yes
+  vars:
+    ansible_user_name: "ansible_bot"
+    ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKEmViNmx4lz824bi5/wsCV+T2goVeSHud2QxmTdTXNt ansible_bot"
+
+  tasks:
+    - name: Ensure group "sudo" exists
+      group:
+        name: sudo
+        state: present
+
+    - name: Create the ansible user
+      user:
+        name: "{{ ansible_user_name }}"
+        shell: /bin/bash
+        groups: sudo
+        append: yes
+
+    - name: Set up passwordless sudo for the ansible user
+      copy:
+        content: "{{ ansible_user_name }} ALL=(ALL) NOPASSWD:ALL"
+        dest: "/etc/sudoers.d/{{ ansible_user_name }}"
+        mode: '0440'
+        validate: 'visudo -cf %s'
+
+    - name: Set authorized key taken from file
+      authorized_key:
+        user: "{{ ansible_user_name }}"
+        state: present
+        key: "{{ ssh_public_key }}"
