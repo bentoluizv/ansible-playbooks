@@ -1,0 +1,46 @@
+---
+# DevSec Docker Baseline: https://dev-sec.io/baselines/docker/
+# CIS Docker Benchmark: https://github.com/dev-sec/cis-docker-benchmark
+# Run when Docker is used: ansible-playbook docker/daemon.yml
+
+- name: Configure Docker daemon (DevSec/CIS)
+  hosts: all
+  become: yes
+
+  handlers:
+    - name: Restart Docker
+      systemd:
+        name: docker
+        state: restarted
+
+  tasks:
+    - name: Check if Docker is installed
+      command: docker --version
+      register: docker_check
+      changed_when: false
+      failed_when: false
+
+    - name: Ensure /etc/docker exists
+      file:
+        path: /etc/docker
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      when: docker_check.rc == 0
+
+    - name: Deploy hardened daemon.json (CIS 2.1, 2.2, 2.3, 2.14, 2.18)
+      template:
+        src: daemon.json.j2
+        dest: /etc/docker/daemon.json
+        owner: root
+        group: root
+        mode: '0644'
+      when: docker_check.rc == 0
+      notify: Restart Docker
+
+    - name: Ensure docker group exists
+      group:
+        name: docker
+        state: present
+      when: docker_check.rc == 0

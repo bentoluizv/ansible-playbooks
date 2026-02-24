@@ -1,0 +1,23 @@
+# DevSec Nginx Baseline: https://dev-sec.io/baselines/nginx/
+# Buffer overflow prevention (nginx-06)
+client_body_buffer_size {{ nginx_client_body_buffer_size | default('1k') }};
+client_max_body_size {{ nginx_client_max_body_size | default('1k') }};
+client_header_buffer_size {{ nginx_client_header_buffer_size | default('1k') }};
+large_client_header_buffers {{ nginx_large_client_header_buffers | default('2 1k') }};
+
+# Timeouts (nginx-17)
+keepalive_timeout {{ nginx_keepalive_timeout | default('5 5') }};
+client_body_timeout {{ nginx_client_body_timeout | default('10') }};
+client_header_timeout {{ nginx_client_header_timeout | default('10') }};
+send_timeout {{ nginx_send_timeout | default('10') }};
+
+# Connection limits (nginx-07)
+limit_conn_zone {{ nginx_limit_conn_zone | default('$binary_remote_addr zone=default:10m') }};
+limit_conn {{ nginx_limit_conn | default('default 5') }};
+
+# Security headers (nginx-08, nginx-09, nginx-10, nginx-13, nginx-15)
+add_header X-Frame-Options SAMEORIGIN always;
+add_header X-Content-Type-Options nosniff always;
+add_header X-XSS-Protection "1; mode=block" always;
+add_header Strict-Transport-Security "max-age=15768000" always;
+add_header Content-Security-Policy "script-src 'self'; object-src 'self'" always;

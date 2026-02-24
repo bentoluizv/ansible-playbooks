@@ -1,0 +1,6 @@
+---
+# DevSec Nginx Baseline: https://dev-sec.io/baselines/nginx/
+# Run both SSL and hardening: ansible-playbook nginx/main.yml
+
+- import_playbook: hardening.yml
+- import_playbook: ssl.yml

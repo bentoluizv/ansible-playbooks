@@ -1,0 +1,58 @@
+# DevSec Linux Baseline - network hardening
+# sysctl-01: IPv4 forwarding (set sysctl_forwarding=true for routers)
+net.ipv4.ip_forward = {{ 1 if sysctl_forwarding | default(false) else 0 }}
+net.ipv4.conf.all.forwarding = {{ 1 if sysctl_forwarding | default(false) else 0 }}
+# sysctl-02: Reverse path filtering
+net.ipv4.conf.all.rp_filter = 1
+net.ipv4.conf.default.rp_filter = 1
+# sysctl-03: ICMP ignore bogus error responses
+net.ipv4.icmp_ignore_bogus_error_responses = 1
+# sysctl-04: ICMP echo ignore broadcasts
+net.ipv4.icmp_echo_ignore_broadcasts = 1
+# sysctl-05/06: ICMP ratelimit
+net.ipv4.icmp_ratelimit = 100
+net.ipv4.icmp_ratemask = 88089
+# sysctl-07: TCP timestamps
+net.ipv4.tcp_timestamps = 0
+# sysctl-08/09: ARP
+net.ipv4.conf.all.arp_ignore = 1
+net.ipv4.conf.all.arp_announce = 2
+# sysctl-10: TCP RFC1337
+net.ipv4.tcp_rfc1337 = 1
+# sysctl-11: SYN flood protection
+net.ipv4.tcp_syncookies = 1
+# sysctl-12: Shared media
+net.ipv4.conf.all.shared_media = 1
+net.ipv4.conf.default.shared_media = 1
+# sysctl-13: Disable source routing
+net.ipv4.conf.all.accept_source_route = 0
+net.ipv4.conf.default.accept_source_route = 0
+net.ipv6.conf.all.accept_source_route = 0
+net.ipv6.conf.default.accept_source_route = 0
+# sysctl-14/15/16: Disable redirects
+net.ipv4.conf.all.accept_redirects = 0
+net.ipv4.conf.default.accept_redirects = 0
+net.ipv4.conf.all.secure_redirects = 0
+net.ipv4.conf.default.secure_redirects = 0
+net.ipv4.conf.all.send_redirects = 0
+net.ipv4.conf.default.send_redirects = 0
+# sysctl-17: Log martians
+net.ipv4.conf.all.log_martians = 1
+net.ipv4.conf.default.log_martians = 1
+# sysctl-19: IPv6 forwarding
+net.ipv6.conf.all.forwarding = {{ 1 if sysctl_forwarding | default(false) else 0 }}
+# sysctl-20: IPv6 redirects
+net.ipv6.conf.all.accept_redirects = 0
+net.ipv6.conf.default.accept_redirects = 0
+# sysctl-21 to 28: IPv6 RA and autoconf
+net.ipv6.conf.default.router_solicitations = 0
+net.ipv6.conf.all.router_solicitations = 0
+net.ipv6.conf.default.accept_ra_rtr_pref = 0
+net.ipv6.conf.default.accept_ra_pinfo = 0
+net.ipv6.conf.default.accept_ra_defrtr = 0
+net.ipv6.conf.all.accept_ra = 0
+net.ipv6.conf.default.accept_ra = 0
+net.ipv6.conf.default.autoconf = 0
+net.ipv6.conf.all.autoconf = 0
+net.ipv6.conf.default.dad_transmits = 0
+net.ipv6.conf.default.max_addresses = 1

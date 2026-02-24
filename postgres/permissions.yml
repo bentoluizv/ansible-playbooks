@@ -1,0 +1,66 @@
+---
+# DevSec Postgres Baseline: https://dev-sec.io/baselines/postgres/
+# Sets CIS-compliant permissions (postgres-10, postgres-20)
+# Run when PostgreSQL is used: ansible-playbook postgres/permissions.yml
+
+- name: Set PostgreSQL file permissions (DevSec)
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: Check if PostgreSQL is installed
+      command: psql --version
+      register: pg_check
+      changed_when: false
+      failed_when: false
+
+    - name: Find PostgreSQL config directory
+      find:
+        paths: /etc/postgresql
+        patterns: postgresql.conf
+      register: pg_conf_find
+      when: pg_check.rc == 0
+
+    - name: Set postgres config paths
+      set_fact:
+        postgres_conf_dir: "{{ (pg_conf_find.files | default([]) | first).path | dirname }}"
+      when:
+        - pg_check.rc == 0
+        - (pg_conf_find.files | default([]) | length) > 0
+
+    - name: Set config directory permissions (postgres-10)
+      file:
+        path: "{{ postgres_conf_dir }}"
+        state: directory
+        owner: postgres
+        group: postgres
+        mode: '0700'
+      when: postgres_conf_dir is defined
+
+    - name: Set postgresql.conf permissions (postgres-10)
+      file:
+        path: "{{ postgres_conf_dir }}/postgresql.conf"
+        owner: postgres
+        group: postgres
+        mode: '0640'
+      when: postgres_conf_dir is defined
+      failed_when: false
+
+    - name: Set pg_hba.conf permissions (postgres-10)
+      file:
+        path: "{{ postgres_conf_dir }}/pg_hba.conf"
+        owner: postgres
+        group: postgres
+        mode: '0640'
+      when: postgres_conf_dir is defined
+      failed_when: false
+
+    - name: Set log directory permissions (postgres-20)
+      file:
+        path: /var/log/postgresql
+        state: directory
+        owner: postgres
+        group: postgres
+        mode: '0700'
+      when: pg_check.rc == 0
+      failed_when: false

@@ -1,0 +1,167 @@
+---
+# Ubuntu equivalent of: https://github.com/trimstray/the-practical-linux-hardening-guide/wiki/Permissions-and-Limits
+# DevSec Linux Baseline: https://dev-sec.io/baselines/linux/
+# Covers: Verify permissions, Restrict filesystems, Restrict programs
+
+- name: Permissions and Limits (Ubuntu Hardening)
+  hosts: all
+  become: yes
+  tasks:
+    # ==========================================================================
+    # Verify permissions (C2S/CIS)
+    # Restrictive permissions for security-critical files
+    # ==========================================================================
+
+    - name: Set /etc/passwd permissions and ownership
+      file:
+        path: /etc/passwd
+        mode: '0644'
+        owner: root
+        group: root
+      # CCE-26949-8, CCE-26887-0, CCE-27138-7, CCE-26639-5
+
+    - name: Set /etc/group permissions and ownership
+      file:
+        path: /etc/group
+        mode: '0644'
+        owner: root
+        group: root
+      # CCE-26933-2, CCE-27037-1
+
+    - name: Set /etc/shadow permissions and ownership
+      file:
+        path: /etc/shadow
+        mode: '0640'
+        owner: root
+        group: shadow
+      # CCE-27100-7, CCE-26795-5, CCE-27125-4
+      # Note: Ubuntu uses 'shadow' group for /etc/shadow (not root)
+
+    - name: Set /etc/gshadow permissions and ownership
+      file:
+        path: /etc/gshadow
+        mode: '0000'
+        owner: root
+        group: root
+      # CCE-27162-7, CCE-27161-9, CCE-26840-9
+
+    # DevSec os-11: Protect log directory
+    - name: Set /var/log ownership (DevSec os-11)
+      file:
+        path: /var/log
+        owner: root
+        group: root
+        state: directory
+
+    # DevSec os-13: Protect cron directories
+    - name: Set cron files and directories ownership (DevSec os-13)
+      file:
+        path: "{{ item }}"
+        owner: root
+        group: root
+      loop:
+        - /etc/crontab
+        - /etc/cron.hourly
+        - /etc/cron.daily
+        - /etc/cron.weekly
+        - /etc/cron.monthly
+        - /etc/cron.d
+      ignore_errors: true
+
+    - name: Set cron permissions (DevSec os-13)
+      file:
+        path: "{{ item.path }}"
+        mode: "{{ item.mode }}"
+      loop:
+        - { path: /etc/crontab, mode: '0600' }
+        - { path: /etc/cron.hourly, mode: '0700' }
+        - { path: /etc/cron.daily, mode: '0700' }
+        - { path: /etc/cron.weekly, mode: '0700' }
+        - { path: /etc/cron.monthly, mode: '0700' }
+        - { path: /etc/cron.d, mode: '0700' }
+      ignore_errors: true
+
+    # ==========================================================================
+    # Restrict filesystems (C2S/CIS, DevSec os-10)
+    # DevSec expects /etc/modprobe.d/dev-sec.conf
+    # Note: vfat excluded if EFI; squashfs excluded if snapd (Ubuntu snaps)
+    # ==========================================================================
+
+    - name: Check if EFI and snapd (for conditional blacklist)
+      block:
+        - stat:
+            path: /sys/firmware/efi
+          register: efi_check
+          failed_when: false
+        - command: systemctl is-active snapd
+          register: snapd_check
+          changed_when: false
+          failed_when: false
+      always:
+        - set_fact:
+            has_efi: "{{ efi_check.stat.exists | default(false) }}"
+            has_snapd: "{{ snapd_check.stdout | default('inactive') == 'active' }}"
+
+    - name: Build filesystem blacklist content
+      set_fact:
+        fs_blacklist: |
+          # DevSec Linux Baseline - disable unused filesystems
+          install cramfs /bin/true
+          install freevxfs /bin/true
+          install jffs2 /bin/true
+          install hfs /bin/true
+          install hfsplus /bin/true
+          install udf /bin/true
+          {{ 'install squashfs /bin/true\n' if not has_snapd | default(false) else '' }}{{ 'install vfat /bin/true\n' if not has_efi | default(false) else '' }}
+
+    - name: Create filesystem blacklist (DevSec os-10)
+      copy:
+        dest: /etc/modprobe.d/dev-sec.conf
+        content: "{{ fs_blacklist }}"
+        mode: '0644'
+
+    - name: Remove legacy fs-blacklist.conf (consolidated to dev-sec.conf)
+      file:
+        path: /etc/modprobe.d/fs-blacklist.conf
+        state: absent
+
+    - name: Disable automounter (autofs)
+      systemd:
+        name: autofs.service
+        enabled: false
+      failed_when: false
+      # CCE-27498-5 (Medium)
+
+    # ==========================================================================
+    # Restrict programs (C2S/CIS)
+    # Disable core dumps, enable ASLR
+    # ==========================================================================
+
+    - name: Configure sysctl hardening
+      copy:
+        dest: /etc/sysctl.d/99-hardening.conf
+        content: |
+          # Disable core dumps (CCE-26900-1, DevSec sysctl-31a)
+          fs.suid_dumpable = 0
+          # ASLR (CCE-27211-2, DevSec sysctl-32)
+          kernel.randomize_va_space = 2
+          # DevSec sysctl-30: Disable Magic SysRq
+          kernel.sysrq = 0
+          # DevSec sysctl-34: Protect links
+          fs.protected_hardlinks = 1
+          fs.protected_symlinks = 1
+          fs.protected_regular = 2
+          fs.protected_fifos = 1
+        mode: '0644'
+
+    - name: Apply sysctl settings
+      command: sysctl -p /etc/sysctl.d/99-hardening.conf
+      changed_when: false
+
+    - name: Disable core dumps in limits.conf
+      lineinfile:
+        path: /etc/security/limits.conf
+        regexp: '^\s*\*\s+hard\s+core\s+'
+        line: '*     hard   core    0'
+        insertafter: EOF
+      # CCE-26900-1, CCE-80169-6

@@ -1,0 +1,146 @@
+---
+# Ubuntu equivalent of: https://github.com/trimstray/the-practical-linux-hardening-guide/wiki/PAM-Module
+# Covers: Password hashing, Failed attempts (faillock), Password reuse, Password quality
+# Note: Ubuntu uses /etc/pam.d/common-* and /etc/security/*.conf (not system-auth)
+
+- name: PAM Module (Ubuntu Hardening)
+  hosts: all
+  become: yes
+  vars:
+    # C2S/CIS - adjust per org policy
+    pam_faillock_deny: 5
+    pam_faillock_unlock_time: 900
+    pam_faillock_fail_interval: 900
+    pam_remember: 5
+    pam_pwquality_minlen: 14
+    pam_pwquality_retry: 3
+    # DevSec os-05: login.defs (027 for Debian/Ubuntu)
+    login_defs_umask: '027'
+    login_defs_passmaxdays: '60'
+    login_defs_passmindays: '7'
+    login_defs_passwarnage: '7'
+
+  tasks:
+    # ==========================================================================
+    # Install required PAM packages
+    # ==========================================================================
+    - name: Install PAM hardening packages
+      apt:
+        name: libpam-pwquality
+        state: present
+      # Note: pam_faillock is in libpam-modules (base), not a separate package
+
+    # ==========================================================================
+    # Password hashing algorithm (CCE-27104-9)
+    # Ubuntu: ENCRYPT_METHOD in login.defs; pam_unix uses it
+    # ==========================================================================
+    - name: Set SHA-512 password hashing in login.defs
+      lineinfile:
+        path: /etc/login.defs
+        regexp: '^#?ENCRYPT_METHOD'
+        line: 'ENCRYPT_METHOD SHA512'
+      # CCE-27104-9 (Medium)
+
+    # DevSec os-05: login.defs configuration
+    - name: Configure login.defs (DevSec os-05)
+      lineinfile:
+        path: /etc/login.defs
+        regexp: '^\s*#?\s*{{ item.key }}\s+'
+        line: "{{ item.key }} {{ item.value }}"
+      loop:
+        - { key: 'UMASK', value: "{{ login_defs_umask }}" }
+        - { key: 'PASS_MAX_DAYS', value: "{{ login_defs_passmaxdays }}" }
+        - { key: 'PASS_MIN_DAYS', value: "{{ login_defs_passmindays }}" }
+        - { key: 'PASS_WARN_AGE', value: "{{ login_defs_passwarnage }}" }
+        - { key: 'LOGIN_RETRIES', value: '5' }
+        - { key: 'LOGIN_TIMEOUT', value: '60' }
+        - { key: 'UID_MIN', value: '1000' }
+        - { key: 'GID_MIN', value: '1000' }
+        - { key: 'ENV_SUPATH', value: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' }
+        - { key: 'ENV_PATH', value: '/usr/local/bin:/usr/bin:/bin' }
+      loop_control:
+        label: "{{ item.key }}"
+
+    # ==========================================================================
+    # Failed password attempts - pam_faillock (CCE-26884-7, CCE-27350-8)
+    # Ubuntu: /etc/security/faillock.conf + common-auth, common-account
+    # ==========================================================================
+    - name: Configure faillock
+      lineinfile:
+        path: /etc/security/faillock.conf
+        regexp: '^\s*#?\s*{{ item.key }}\s*='
+        line: "{{ item.key }} = {{ item.value }}"
+      loop:
+        - { key: 'deny', value: "{{ pam_faillock_deny }}" }
+        - { key: 'fail_interval', value: "{{ pam_faillock_fail_interval }}" }
+        - { key: 'unlock_time', value: "{{ pam_faillock_unlock_time }}" }
+        - { key: 'audit', value: 'true' }
+        - { key: 'silent', value: 'true' }
+      loop_control:
+        label: "{{ item.key }}"
+
+    - name: Add pam_faillock preauth to common-auth
+      lineinfile:
+        path: /etc/pam.d/common-auth
+        regexp: 'auth\s+required\s+pam_faillock\.so preauth'
+        line: 'auth    required    pam_faillock.so preauth'
+        insertbefore: 'auth\s+\[success=1 default=ignore\].*pam_unix'
+        state: present
+
+    - name: Add pam_faillock authfail to common-auth
+      lineinfile:
+        path: /etc/pam.d/common-auth
+        regexp: 'auth\s+\[default=die\].*pam_faillock\.so authfail'
+        line: 'auth    [default=die]    pam_faillock.so authfail'
+        insertafter: 'auth\s+\[success=1 default=ignore\].*pam_unix'
+        state: present
+
+    - name: Add pam_faillock to common-account
+      lineinfile:
+        path: /etc/pam.d/common-account
+        regexp: 'account\s+required\s+pam_faillock\.so'
+        line: 'account    required    pam_faillock.so'
+        insertbefore: 'account\s+\[success=1 new_authtok_reqd=ignore default=ignore\].*pam_unix'
+        state: present
+
+    # ==========================================================================
+    # Limit password reuse (CCE-26923-3)
+    # ==========================================================================
+    - name: Remove existing remember from pam_unix line (for idempotency)
+      replace:
+        path: /etc/pam.d/common-password
+        regexp: '\s+remember=\d+'
+        replace: ''
+
+    - name: Add remember to pam_unix in common-password
+      replace:
+        path: /etc/pam.d/common-password
+        regexp: '(password\s+.*pam_unix\.so\s+)(.*?)(\s*)$'
+        replace: '\1\2 remember={{ pam_remember }}\3'
+
+    # ==========================================================================
+    # Password quality requirements (CCE-27160-1, CCE-27293-0, CCE-27214-6, etc.)
+    # ==========================================================================
+    - name: Add or update pam_pwquality in common-password
+      lineinfile:
+        path: /etc/pam.d/common-password
+        regexp: '^password\s+requisite\s+.*pam_pwquality'
+        line: 'password        requisite                       pam_pwquality.so retry={{ pam_pwquality_retry }} try_first_pass local_users_only'
+        insertbefore: '^password\s+.*pam_unix'
+        state: present
+
+    - name: Configure pwquality.conf
+      lineinfile:
+        path: /etc/security/pwquality.conf
+        regexp: '^\s*#?\s*{{ item.key }}\s*='
+        line: "{{ item.key }} = {{ item.value }}"
+      loop:
+        - { key: 'minlen', value: "{{ pam_pwquality_minlen }}" }
+        - { key: 'dcredit', value: '-1' }
+        - { key: 'ucredit', value: '-1' }
+        - { key: 'lcredit', value: '-1' }
+        - { key: 'ocredit', value: '-1' }
+        - { key: 'difok', value: '4' }
+        - { key: 'maxrepeat', value: '3' }
+      loop_control:
+        label: "{{ item.key }}"

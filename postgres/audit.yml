@@ -1,0 +1,60 @@
+---
+# DevSec Postgres Baseline Audit: https://dev-sec.io/baselines/postgres/
+# Run when PostgreSQL is used: ansible-playbook postgres/audit.yml
+
+- name: DevSec PostgreSQL Configuration Audit
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: Check if PostgreSQL is installed
+      command: psql --version
+      register: pg_check
+      changed_when: false
+      failed_when: false
+
+    - name: Find PostgreSQL config directory
+      find:
+        paths: /etc/postgresql
+        patterns: postgresql.conf
+      register: pg_conf_find
+      when: pg_check.rc == 0
+
+    - name: Set postgres config paths
+      set_fact:
+        postgres_conf_dir: "{{ (pg_conf_find.files | default([]) | first).path | dirname }}"
+      when:
+        - pg_check.rc == 0
+        - (pg_conf_find.files | default([]) | length) > 0
+
+    - name: Verify config directory ownership (postgres-10)
+      command: stat -c '%U' "{{ postgres_conf_dir }}"
+      register: pg_conf_owner
+      changed_when: false
+      when: postgres_conf_dir is defined
+
+    - name: Assert config directory is owned by postgres
+      assert:
+        that: pg_conf_owner.stdout | trim == 'postgres'
+        fail_msg: "Config directory should be owned by postgres (postgres-10)"
+      when: postgres_conf_dir is defined and pg_conf_owner.stdout is defined
+
+    - name: Verify hardening config exists
+      stat:
+        path: "{{ postgres_conf_dir }}/conf.d/99-hardening.conf"
+      register: hardening_conf
+      when: postgres_conf_dir is defined
+
+    - name: Verify logging settings in hardening config (postgres-16)
+      command: grep -qE 'log_connections|log_disconnections|logging_collector' "{{ postgres_conf_dir }}/conf.d/99-hardening.conf"
+      register: pg_logging
+      changed_when: false
+      failed_when: pg_logging.rc != 0
+      when: postgres_conf_dir is defined and hardening_conf.stat.exists
+
+    - name: Verify password_encryption in hardening config (postgres-07)
+      command: grep -qE 'password_encryption|scram-sha-256' "{{ postgres_conf_dir }}/conf.d/99-hardening.conf"
+      register: pg_password_enc
+      changed_when: false
+      failed_when: pg_password_enc.rc != 0
+      when: postgres_conf_dir is defined and hardening_conf.stat.exists

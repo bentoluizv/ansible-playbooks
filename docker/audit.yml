@@ -1,0 +1,48 @@
+---
+# DevSec Docker Configuration Audit
+# Run when Docker is used: ansible-playbook docker/audit.yml
+
+- name: DevSec Docker Configuration Audit
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: Check if Docker is installed
+      command: docker --version
+      register: docker_check
+      changed_when: false
+      failed_when: false
+
+    - name: Check if daemon.json exists
+      stat:
+        path: /etc/docker/daemon.json
+      register: daemon_json
+
+    - name: Verify icc is false (CIS 2.1 - restrict inter-container traffic)
+      command: grep -q '"icc":\s*false' /etc/docker/daemon.json
+      register: docker_icc
+      changed_when: false
+      failed_when: docker_icc.rc != 0
+      when: daemon_json.stat.exists
+
+    - name: Verify log-level is info (CIS 2.2)
+      command: grep -qE '"log-level":\s*"info"' /etc/docker/daemon.json
+      register: docker_log
+      changed_when: false
+      failed_when: docker_log.rc != 0
+      when: daemon_json.stat.exists
+
+    - name: Verify userland-proxy is false (CIS 2.18)
+      command: grep -q '"userland-proxy":\s*false' /etc/docker/daemon.json
+      register: docker_userland
+      changed_when: false
+      failed_when: docker_userland.rc != 0
+      when: daemon_json.stat.exists
+
+    - name: Assert daemon.json is root:root (CIS 3.17)
+      assert:
+        that:
+          - daemon_json.stat.uid == 0
+          - daemon_json.stat.gid == 0
+        fail_msg: "daemon.json must be owned by root:root (CIS 3.17)"
+      when: daemon_json.stat.exists

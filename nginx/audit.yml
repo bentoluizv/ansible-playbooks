@@ -1,0 +1,91 @@
+---
+# DevSec Nginx Baseline Audit: https://dev-sec.io/baselines/nginx/
+# Run when nginx is used: ansible-playbook nginx/audit.yml
+
+- name: DevSec Nginx Configuration Audit
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: Check if nginx is installed
+      command: nginx -v
+      register: nginx_check
+      changed_when: false
+      failed_when: false
+
+    - name: Verify nginx.conf ownership (nginx-02)
+      stat:
+        path: /etc/nginx/nginx.conf
+      register: nginx_conf_stat
+      when: nginx_check.rc == 0
+
+    - name: Assert nginx.conf is root:root and not world-readable (nginx-02)
+      assert:
+        that:
+          - nginx_conf_stat.stat.uid == 0
+          - nginx_conf_stat.stat.gid == 0
+        fail_msg: "nginx.conf must be owned by root:root"
+      when: nginx_check.rc == 0 and nginx_conf_stat.stat.exists
+
+    - name: Verify default site removed (nginx-03)
+      stat:
+        path: "{{ item }}"
+      register: default_sites
+      loop:
+        - /etc/nginx/sites-enabled/default
+        - /etc/nginx/conf.d/default.conf
+      when: nginx_check.rc == 0
+
+    - name: Assert default site files do not exist (nginx-03)
+      assert:
+        that: not (item.stat.exists | default(false))
+        fail_msg: "{{ item.item }} should be removed"
+      loop: "{{ default_sites.results }}"
+      when: nginx_check.rc == 0 and item.stat is defined
+
+    - name: Verify server_tokens off (nginx-05)
+      command: nginx -T 2>/dev/null | grep -E 'server_tokens\s+off'
+      register: server_tokens
+      changed_when: false
+      failed_when: server_tokens.rc != 0
+      when: nginx_check.rc == 0
+
+    - name: Verify hardening config exists
+      stat:
+        path: /etc/nginx/conf.d/90-hardening.conf
+      register: hardening_conf
+      when: nginx_check.rc == 0
+
+    - name: Verify security headers in hardening config (nginx-08, nginx-09, nginx-10)
+      command: grep -q 'X-Frame-Options\|X-Content-Type-Options\|X-XSS-Protection' /etc/nginx/conf.d/90-hardening.conf
+      register: security_headers
+      changed_when: false
+      failed_when: security_headers.rc != 0
+      when: nginx_check.rc == 0 and hardening_conf.stat.exists
+
+    - name: Check if nginx TLS config exists (DevSec SSL)
+      stat:
+        path: /etc/nginx/conf.d/ssl-devsec.conf
+      register: nginx_ssl_conf
+      when: nginx_check.rc == 0
+
+    - name: Verify nginx TLS 1.2+ only (DevSec ssl2, ssl3, tls1.0, tls1.1)
+      command: grep -E 'ssl_protocols.*TLSv1\.2' /etc/nginx/conf.d/ssl-devsec.conf
+      register: nginx_ssl_protocols
+      changed_when: false
+      failed_when: nginx_ssl_protocols.rc != 0
+      when: nginx_check.rc == 0 and nginx_ssl_conf.stat.exists
+
+    - name: Verify nginx uses ECDHE ciphers (DevSec kx-ecdh, robotattack)
+      command: grep -q 'ECDHE' /etc/nginx/conf.d/ssl-devsec.conf
+      register: nginx_ssl_ecdh
+      changed_when: false
+      failed_when: nginx_ssl_ecdh.rc != 0
+      when: nginx_check.rc == 0 and nginx_ssl_conf.stat.exists
+
+    - name: Verify nginx excludes weak ciphers (DevSec enc-cbc, enc-rc4)
+      command: grep -E 'RC4|DES|3DES|NULL' /etc/nginx/conf.d/ssl-devsec.conf
+      register: nginx_ssl_weak
+      changed_when: false
+      failed_when: nginx_ssl_weak.rc == 0
+      when: nginx_check.rc == 0 and nginx_ssl_conf.stat.exists

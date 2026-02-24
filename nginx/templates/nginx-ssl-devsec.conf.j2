@@ -1,0 +1,15 @@
+# DevSec SSL Baseline: https://dev-sec.io/baselines/ssl/
+# Mozilla TLS: https://ssl-config.mozilla.org/
+# TLS 1.2+ only, ECDHE ciphers, no RSA/DH key exchange (ROBOT mitigation)
+
+ssl_protocols TLSv1.2 TLSv1.3;
+ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305;
+ssl_prefer_server_ciphers off;
+ssl_session_timeout 1d;
+ssl_session_cache shared:SSL:50m;
+ssl_session_tickets off;
+ssl_ecdh_curve X25519:prime256v1:secp384r1;
+{% if nginx_ssl_tls13_ciphersuites | default(true) %}
+# TLS 1.3 ciphersuites (nginx 1.19.4+)
+ssl_conf_command Ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256;
+{% endif %}

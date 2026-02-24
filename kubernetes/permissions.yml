@@ -1,0 +1,110 @@
+---
+# DevSec Kubernetes Baseline: https://dev-sec.io/baselines/kubernetes/
+# CIS Kubernetes Benchmark: https://github.com/dev-sec/cis-kubernetes-benchmark
+# Sets CIS-compliant permissions on kubeadm cluster config files
+# Run when K8s cluster nodes: ansible-playbook kubernetes/permissions.yml
+
+- name: Set Kubernetes config file permissions (CIS)
+  hosts: all
+  become: yes
+
+  vars:
+    k8s_manifest_paths:
+      - /etc/kubernetes/manifests/kube-apiserver.yaml
+      - /etc/kubernetes/manifests/kube-controller-manager.yaml
+      - /etc/kubernetes/manifests/kube-scheduler.yaml
+      - /etc/kubernetes/manifests/etcd.yaml
+    k8s_conf_paths:
+      - /etc/kubernetes/admin.conf
+      - /etc/kubernetes/scheduler.conf
+      - /etc/kubernetes/controller-manager.conf
+      - /etc/kubernetes/kubelet.conf
+    k8s_kubelet_service: /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+
+  tasks:
+    - name: Check if Kubernetes config exists
+      stat:
+        path: /etc/kubernetes
+      register: k8s_dir
+
+    - name: Set /etc/kubernetes ownership (CIS 1.1.19)
+      file:
+        path: /etc/kubernetes
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      when: k8s_dir.stat.exists
+
+    - name: Set manifest file permissions and ownership (CIS 1.1.1-1.1.8)
+      file:
+        path: "{{ item }}"
+        owner: root
+        group: root
+        mode: '0644'
+      loop: "{{ k8s_manifest_paths }}"
+      when: k8s_dir.stat.exists
+      failed_when: false
+
+    - name: Set kubeconfig permissions and ownership (CIS 1.1.13-1.1.18, 4.1.2, 4.1.5)
+      file:
+        path: "{{ item }}"
+        owner: root
+        group: root
+        mode: '0644'
+      loop: "{{ k8s_conf_paths }}"
+      when: k8s_dir.stat.exists
+      failed_when: false
+
+    - name: Set kubelet service file permissions (CIS 4.1.1, 4.1.6)
+      file:
+        path: "{{ k8s_kubelet_service }}"
+        owner: root
+        group: root
+        mode: '0644'
+      when: k8s_dir.stat.exists
+      failed_when: false
+
+    - name: Set PKI directory ownership (CIS 1.1.19)
+      file:
+        path: /etc/kubernetes/pki
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      when: k8s_dir.stat.exists
+      failed_when: false
+
+    - name: Find PKI certificate files
+      find:
+        paths: /etc/kubernetes/pki
+        patterns: "*.crt"
+      register: pki_certs
+      when: k8s_dir.stat.exists
+      failed_when: false
+
+    - name: Set PKI certificate file permissions (CIS 1.1.20)
+      file:
+        path: "{{ item.path }}"
+        owner: root
+        group: root
+        mode: '0644'
+      loop: "{{ pki_certs.files | default([]) }}"
+      when: k8s_dir.stat.exists and (pki_certs.files | default([]) | length) > 0
+
+    - name: Find PKI key files
+      find:
+        paths: /etc/kubernetes/pki
+        patterns: "*.key"
+      register: pki_keys
+      when: k8s_dir.stat.exists
+      failed_when: false
+
+    - name: Set PKI key file permissions (CIS 1.1.21)
+      file:
+        path: "{{ item.path }}"
+        owner: root
+        group: root
+        mode: '0600'
+      loop: "{{ pki_keys.files | default([]) }}"
+      when: k8s_dir.stat.exists and (pki_keys.files | default([]) | length) > 0

@@ -1,111 +1,286 @@
 ---
-- name: Harden SSH Configuration
+# DevSec SSH Baseline: https://dev-sec.io/baselines/ssh/
+# https://github.com/dev-sec/ssh-baseline
+
+- name: Harden SSH Configuration (DevSec)
   hosts: all
   become: yes
+  vars:
+    sshd_port: '22'
+    sshd_max_auth_tries: 2
+    sshd_x11forwarding: 'no'
+    sshd_banner: '/etc/issue'
+    # DevSec crypto (OpenSSH 6.6+)
+    sshd_ciphers: 'chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr'
+    sshd_kexs: 'curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group-exchange-sha256,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512'
+    sshd_macs: 'hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-512,hmac-sha2-256'
+
   tasks:
-    - name: Ensure SSH protocol version 2
+    # sshd-04/05: File permissions
+    - name: Set /etc/ssh directory permissions (DevSec sshd-04)
+      file:
+        path: /etc/ssh
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Set sshd_config permissions (DevSec sshd-05)
+      file:
+        path: /etc/ssh/sshd_config
+        owner: root
+        group: root
+        mode: '0600'
+
+    # sshd-01/02/03: Crypto
+    - name: Set SSH ciphers (DevSec sshd-01)
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?Ciphers'
+        line: 'Ciphers {{ sshd_ciphers }}'
+      notify: Restart SSH service
+
+    - name: Set KexAlgorithms (DevSec sshd-02)
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?KexAlgorithms'
+        line: 'KexAlgorithms {{ sshd_kexs }}'
+      notify: Restart SSH service
+
+    - name: Set MAC algorithms (DevSec sshd-03)
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?MACs'
+        line: 'MACs {{ sshd_macs }}'
+      notify: Restart SSH service
+
+    # sshd-06/07/08/09
+    - name: Set Protocol 2 (DevSec sshd-10)
       lineinfile:
         path: /etc/ssh/sshd_config
         regexp: '^#?Protocol'
         line: 'Protocol 2'
       notify: Restart SSH service
 
-    - name: Disable empty passwords
+    - name: Set Port (DevSec sshd-07)
       lineinfile:
         path: /etc/ssh/sshd_config
-        regexp: '^#?PermitEmptyPasswords'
-        line: 'PermitEmptyPasswords no'
+        regexp: '^#?Port'
+        line: 'Port {{ sshd_port }}'
       notify: Restart SSH service
 
-    - name: Set SSH client alive count max
+    - name: Set AddressFamily (DevSec sshd-08)
       lineinfile:
         path: /etc/ssh/sshd_config
-        regexp: '^#?ClientAliveCountMax'
-        line: 'ClientAliveCountMax 0'
+        regexp: '^#?AddressFamily'
+        line: 'AddressFamily any'
       notify: Restart SSH service
 
-    - name: Set SSH client alive interval
+    - name: Set ListenAddress (DevSec sshd-09)
       lineinfile:
         path: /etc/ssh/sshd_config
-        regexp: '^#?ClientAliveInterval'
-        line: 'ClientAliveInterval 300'
+        regexp: '^#?ListenAddress'
+        line: 'ListenAddress 0.0.0.0'
       notify: Restart SSH service
 
-    - name: Set SSH warning banner
+    # sshd-11/12/13
+    - name: Enable StrictModes (DevSec sshd-11)
       lineinfile:
         path: /etc/ssh/sshd_config
-        regexp: '^#?Banner'
-        line: 'Banner /etc/issue'
+        regexp: '^#?StrictModes'
+        line: 'StrictModes yes'
       notify: Restart SSH service
 
-    - name: Set SSH MAC algorithms
+    - name: Set SyslogFacility (DevSec sshd-12)
       lineinfile:
         path: /etc/ssh/sshd_config
-        regexp: '^#?MACs'
-        line: 'MACs hmac-sha2-512,hmac-sha2-256,hmac-sha1'
+        regexp: '^#?SyslogFacility'
+        line: 'SyslogFacility AUTH'
       notify: Restart SSH service
 
-    - name: Disable SSH user environment options
+    - name: Set LogLevel (DevSec sshd-13)
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?LogLevel'
+        line: 'LogLevel VERBOSE'
+      notify: Restart SSH service
+
+    # sshd-17/18/19/20/21
+    - name: Disable PermitUserEnvironment (DevSec sshd-17)
       lineinfile:
         path: /etc/ssh/sshd_config
         regexp: '^#?PermitUserEnvironment'
         line: 'PermitUserEnvironment no'
       notify: Restart SSH service
 
-    - name: Ignore .rhosts files
+    - name: Set LoginGraceTime (DevSec sshd-18)
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?LoginGraceTime'
+        line: 'LoginGraceTime 30'
+      notify: Restart SSH service
+
+    - name: Set MaxAuthTries (DevSec sshd-19)
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?MaxAuthTries'
+        line: 'MaxAuthTries {{ sshd_max_auth_tries }}'
+      notify: Restart SSH service
+
+    - name: Set MaxSessions (DevSec sshd-20)
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?MaxSessions'
+        line: 'MaxSessions 10'
+      notify: Restart SSH service
+
+    - name: Set MaxStartups (DevSec sshd-21)
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?MaxStartups'
+        line: 'MaxStartups 10:30:60'
+      notify: Restart SSH service
+
+    # sshd-22/23/24/25
+    - name: Enable PubkeyAuthentication (DevSec sshd-22)
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PubkeyAuthentication'
+        line: 'PubkeyAuthentication yes'
+      notify: Restart SSH service
+
+    - name: Ignore .rhosts (DevSec sshd-23)
       lineinfile:
         path: /etc/ssh/sshd_config
         regexp: '^#?IgnoreRhosts'
         line: 'IgnoreRhosts yes'
       notify: Restart SSH service
 
-    - name: Set SSH log level
+    - name: Ignore UserKnownHosts (DevSec sshd-24)
       lineinfile:
         path: /etc/ssh/sshd_config
-        regexp: '^#?LogLevel'
-        line: 'LogLevel INFO'
+        regexp: '^#?IgnoreUserKnownHosts'
+        line: 'IgnoreUserKnownHosts yes'
       notify: Restart SSH service
 
-    - name: Set validated SSH ciphers
-      lineinfile:
-        path: /etc/ssh/sshd_config
-        regexp: '^#?Ciphers'
-        line: 'Ciphers aes128-ctr,aes192-ctr,aes256-ctr,aes128-cbc,3des-cbc,aes192-cbc,aes256-cbc'
-      notify: Restart SSH service
-
-    - name: Enable encrypted X11 forwarding
-      lineinfile:
-        path: /etc/ssh/sshd_config
-        regexp: '^#?X11Forwarding'
-        line: 'X11Forwarding yes'
-      notify: Restart SSH service
-
-    - name: Disable host-based authentication
+    - name: Disable HostbasedAuthentication (DevSec sshd-25)
       lineinfile:
         path: /etc/ssh/sshd_config
         regexp: '^#?HostbasedAuthentication'
         line: 'HostbasedAuthentication no'
       notify: Restart SSH service
 
-    - name: Limit SSH authentication attempts
-      lineinfile:
-        path: /etc/ssh/sshd_config
-        regexp: '^#?MaxAuthTries'
-        line: 'MaxAuthTries 4'
-      notify: Restart SSH service
-
-    - name: Disable Root Login via SSH
-      lineinfile:
-        path: /etc/ssh/sshd_config
-        regexp: '^#?PermitRootLogin'
-        line: 'PermitRootLogin no'
-      notify: Restart SSH service
-
-    - name: Disable Password Authentication
+    # sshd-27/28/29
+    - name: Disable PasswordAuthentication (DevSec sshd-27)
       lineinfile:
         path: /etc/ssh/sshd_config
         regexp: '^#?PasswordAuthentication'
         line: 'PasswordAuthentication no'
+      notify: Restart SSH service
+
+    - name: Disable empty passwords (DevSec sshd-28)
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PermitEmptyPasswords'
+        line: 'PermitEmptyPasswords no'
+      notify: Restart SSH service
+
+    - name: Disable ChallengeResponseAuthentication (DevSec sshd-29)
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?ChallengeResponseAuthentication'
+        line: 'ChallengeResponseAuthentication no'
+      notify: Restart SSH service
+
+    # sshd-30/31/32/33/34
+    - name: Disable Kerberos (DevSec sshd-30/31/32)
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?{{ item }}'
+        line: '{{ item }} no'
+      loop:
+        - KerberosAuthentication
+        - KerberosOrLocalPasswd
+      notify: Restart SSH service
+
+    - name: Enable KerberosTicketCleanup (DevSec sshd-32)
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?KerberosTicketCleanup'
+        line: 'KerberosTicketCleanup yes'
+      notify: Restart SSH service
+
+    - name: Disable GSSAPI (DevSec sshd-33/34)
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?{{ item.key }}'
+        line: '{{ item.key }} {{ item.value }}'
+      loop:
+        - { key: 'GSSAPIAuthentication', value: 'no' }
+        - { key: 'GSSAPICleanupCredentials', value: 'yes' }
+      notify: Restart SSH service
+
+    # sshd-35/36/37
+    - name: Disable TCPKeepAlive (DevSec sshd-35)
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?TCPKeepAlive'
+        line: 'TCPKeepAlive no'
+      notify: Restart SSH service
+
+    - name: Set ClientAliveInterval (DevSec sshd-36)
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?ClientAliveInterval'
+        line: 'ClientAliveInterval 300'
+      notify: Restart SSH service
+
+    - name: Set ClientAliveCountMax (DevSec sshd-37)
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?ClientAliveCountMax'
+        line: 'ClientAliveCountMax 3'
+      notify: Restart SSH service
+
+    # sshd-38/39/40/41
+    - name: Disable tunnels and forwarding (DevSec sshd-38/39/40/41)
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?{{ item.key }}'
+        line: '{{ item.key }} {{ item.value }}'
+      loop:
+        - { key: 'PermitTunnel', value: 'no' }
+        - { key: 'AllowTcpForwarding', value: 'no' }
+        - { key: 'AllowAgentForwarding', value: 'no' }
+        - { key: 'GatewayPorts', value: 'no' }
+      notify: Restart SSH service
+
+    # sshd-42/43/44/45/46/47
+    - name: Configure X11, Motd, Banner (DevSec sshd-42/43/44/45/46)
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?{{ item.key }}'
+        line: '{{ item.key }} {{ item.value }}'
+      loop:
+        - { key: 'X11Forwarding', value: "{{ sshd_x11forwarding }}" }
+        - { key: 'X11UseLocalhost', value: 'yes' }
+        - { key: 'PrintMotd', value: 'no' }
+        - { key: 'PrintLastLog', value: 'no' }
+        - { key: 'Banner', value: "{{ sshd_banner }}" }
+      notify: Restart SSH service
+
+    - name: Disable DebianBanner (DevSec sshd-47, Ubuntu/Debian)
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?DebianBanner'
+        line: 'DebianBanner no'
+      notify: Restart SSH service
+
+    - name: Disable Root Login (DevSec sshd-06)
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PermitRootLogin'
+        line: 'PermitRootLogin no'
       notify: Restart SSH service
 
   handlers:

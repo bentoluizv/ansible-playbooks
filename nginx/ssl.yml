@@ -1,0 +1,37 @@
+---
+# DevSec SSL Baseline: https://dev-sec.io/baselines/ssl/
+# Mozilla TLS: https://ssl-config.mozilla.org/
+# Configures TLS for nginx (TLS 1.2+, ECDHE ciphers, ROBOT mitigation)
+# Run when nginx is used: ansible-playbook nginx/ssl.yml
+
+- name: Configure TLS for nginx (DevSec SSL)
+  hosts: all
+  become: yes
+  vars:
+    ssl_configure_nginx: true
+    nginx_ssl_tls13_ciphersuites: true
+
+  handlers:
+    - name: Reload nginx
+      systemd:
+        name: nginx
+        state: reloaded
+
+  tasks:
+    - name: Check if nginx is installed
+      command: nginx -v
+      register: nginx_check
+      changed_when: false
+      failed_when: false
+
+    - name: Deploy DevSec TLS config for nginx
+      template:
+        src: nginx-ssl-devsec.conf.j2
+        dest: /etc/nginx/conf.d/ssl-devsec.conf
+        owner: root
+        group: root
+        mode: '0644'
+      when:
+        - ssl_configure_nginx | default(true) | bool
+        - nginx_check.rc == 0
+      notify: Reload nginx

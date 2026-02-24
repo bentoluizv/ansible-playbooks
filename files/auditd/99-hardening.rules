@@ -1,0 +1,79 @@
+## Ubuntu equivalent of: https://github.com/trimstray/the-practical-linux-hardening-guide/wiki/Auditd
+## CIS/C2S audit rules - Ubuntu paths (AppArmor instead of SELinux)
+
+## Kernel module loading/unloading
+-w /usr/sbin/insmod -p x -k modules
+-w /usr/sbin/rmmod -p x -k modules
+-w /usr/sbin/modprobe -p x -k modules
+-a always,exit -F arch=b64 -S init_module,finit_module,delete_module -F key=modules
+-a always,exit -F arch=b32 -S init_module,finit_module,delete_module -F key=modules
+
+## Logon/logout events
+-w /var/log/tallylog -p wa -k logins
+-w /var/run/faillock -p wa -k logins
+-w /var/log/lastlog -p wa -k logins
+
+## Time change rules
+-a always,exit -F arch=b32 -S stime -F key=audit_time_rules
+-a always,exit -F arch=b32 -S settimeofday -F key=audit_time_rules
+-a always,exit -F arch=b64 -S settimeofday -F key=audit_time_rules
+-w /etc/localtime -p wa -k audit_time_rules
+-a always,exit -F arch=b32 -S clock_settime -F a0=0x0 -F key=time-change
+-a always,exit -F arch=b64 -S clock_settime -F a0=0x0 -F key=time-change
+-a always,exit -F arch=b32 -S adjtimex -F key=audit_time_rules
+-a always,exit -F arch=b64 -S adjtimex -F key=audit_time_rules
+
+## DAC modifications (perm_mod)
+-a always,exit -F arch=b32 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=4294967295 -F key=perm_mod
+-a always,exit -F arch=b64 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=4294967295 -F key=perm_mod
+-a always,exit -F arch=b32 -S chown,fchown,fchownat,lchown -F auid>=1000 -F auid!=4294967295 -F key=perm_mod
+-a always,exit -F arch=b64 -S chown,fchown,fchownat,lchown -F auid>=1000 -F auid!=4294967295 -F key=perm_mod
+-a always,exit -F arch=b32 -S setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr -F auid>=1000 -F auid!=4294967295 -F key=perm_mod
+-a always,exit -F arch=b64 -S setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr -F auid>=1000 -F auid!=4294967295 -F key=perm_mod
+
+## File deletion events
+-a always,exit -F arch=b32 -S unlink,unlinkat,rename,renameat -F auid>=1000 -F auid!=4294967295 -F key=delete
+-a always,exit -F arch=b64 -S unlink,unlinkat,rename,renameat -F auid>=1000 -F auid!=4294967295 -F key=delete
+
+## Unauthorized access attempts
+-a always,exit -F arch=b32 -S truncate,ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=4294967295 -F key=access
+-a always,exit -F arch=b32 -S truncate,ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=4294967295 -F key=access
+-a always,exit -F arch=b64 -S truncate,ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=4294967295 -F key=access
+-a always,exit -F arch=b64 -S truncate,ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=4294967295 -F key=access
+-a always,exit -F arch=b32 -S creat,open,openat,open_by_handle_at -F exit=-EACCES -F auid>=1000 -F auid!=4294967295 -F key=access
+-a always,exit -F arch=b32 -S creat,open,openat,open_by_handle_at -F exit=-EPERM -F auid>=1000 -F auid!=4294967295 -F key=access
+-a always,exit -F arch=b64 -S creat,open,openat,open_by_handle_at -F exit=-EACCES -F auid>=1000 -F auid!=4294967295 -F key=access
+-a always,exit -F arch=b64 -S creat,open,openat,open_by_handle_at -F exit=-EPERM -F auid>=1000 -F auid!=4294967295 -F key=access
+
+## System administrator actions (sudoers)
+-w /etc/sudoers -p wa -k actions
+-w /etc/sudoers.d/ -p wa -k actions
+
+## Network environment (Ubuntu: skip /etc/sysconfig/network)
+-a always,exit -F arch=b32 -S sethostname,setdomainname -F key=audit_rules_networkconfig_modification
+-a always,exit -F arch=b64 -S sethostname,setdomainname -F key=audit_rules_networkconfig_modification
+-w /etc/issue -p wa -k audit_rules_networkconfig_modification
+-w /etc/issue.net -p wa -k audit_rules_networkconfig_modification
+-w /etc/hosts -p wa -k audit_rules_networkconfig_modification
+
+## Session initiation
+-w /var/run/utmp -p wa -k session
+-w /var/log/btmp -p wa -k session
+-w /var/log/wtmp -p wa -k session
+
+## User/group modification
+-w /etc/passwd -p wa -k audit_rules_usergroup_modification
+-w /etc/group -p wa -k audit_rules_usergroup_modification
+-w /etc/shadow -p wa -k audit_rules_usergroup_modification
+-w /etc/gshadow -p wa -k audit_rules_usergroup_modification
+-w /etc/security/opasswd -p wa -k audit_rules_usergroup_modification
+
+## Export to media
+-a always,exit -F arch=b32 -S mount -F auid>=1000 -F auid!=4294967295 -F key=export
+-a always,exit -F arch=b64 -S mount -F auid>=1000 -F auid!=4294967295 -F key=export
+
+## MAC policy (Ubuntu: AppArmor instead of SELinux)
+-w /etc/apparmor.d/ -p wa -k MAC-policy
+
+## Make configuration immutable (must be last)
+-e 2

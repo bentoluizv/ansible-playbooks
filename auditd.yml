@@ -1,0 +1,87 @@
+---
+# Ubuntu equivalent of: https://github.com/trimstray/the-practical-linux-hardening-guide/wiki/Auditd
+# Covers: audit=1 in grub, auditd service, auditd.conf, extended audit rules
+
+- name: Auditd (Ubuntu Hardening)
+  hosts: all
+  become: yes
+  vars:
+    # DevSec package-08 alignment
+    auditd_max_log_file: 8
+    auditd_action_mail_acct: root
+    auditd_space_left: 75
+    auditd_space_left_action: SYSLOG
+    auditd_admin_space_left: 50
+    auditd_admin_space_left_action: SUSPEND
+    auditd_max_log_file_action: keep_logs
+    auditd_disk_full_action: SUSPEND
+    auditd_disk_error_action: SUSPEND
+
+  tasks:
+    # ==========================================================================
+    # Install auditd
+    # ==========================================================================
+    - name: Install auditd
+      apt:
+        name: auditd
+        state: present
+
+    # ==========================================================================
+    # Enable auditing for processes before audit daemon (CCE-27212-0)
+    # ==========================================================================
+    - name: Ensure audit=1 in GRUB_CMDLINE_LINUX
+      replace:
+        path: /etc/default/grub
+        regexp: '(GRUB_CMDLINE_LINUX=")((?:(?!audit=1).)*)(")'
+        replace: '\1\2 audit=1\3'
+      register: grub_audit_change
+
+    - name: Update GRUB after audit config
+      command: update-grub
+      when: grub_audit_change is changed
+
+    # ==========================================================================
+    # Enable auditd service (CCE-27407-6)
+    # ==========================================================================
+    - name: Enable and start auditd
+      systemd:
+        name: auditd
+        enabled: true
+        state: started
+
+    # ==========================================================================
+    # auditd.conf settings (DevSec package-08)
+    # ==========================================================================
+    - name: Configure auditd
+      lineinfile:
+        path: /etc/audit/auditd.conf
+        regexp: '^\s*#?\s*{{ item.key }}\s*='
+        line: "{{ item.key }} = {{ item.value }}"
+      loop:
+        - { key: 'max_log_file', value: "{{ auditd_max_log_file }}" }
+        - { key: 'action_mail_acct', value: "{{ auditd_action_mail_acct }}" }
+        - { key: 'space_left', value: "{{ auditd_space_left }}" }
+        - { key: 'space_left_action', value: "{{ auditd_space_left_action }}" }
+        - { key: 'admin_space_left', value: "{{ auditd_admin_space_left }}" }
+        - { key: 'admin_space_left_action', value: "{{ auditd_admin_space_left_action }}" }
+        - { key: 'max_log_file_action', value: "{{ auditd_max_log_file_action }}" }
+        - { key: 'disk_full_action', value: "{{ auditd_disk_full_action }}" }
+        - { key: 'disk_error_action', value: "{{ auditd_disk_error_action }}" }
+      loop_control:
+        label: "{{ item.key }}"
+
+    # ==========================================================================
+    # Deploy audit rules
+    # ==========================================================================
+    - name: Deploy audit hardening rules
+      copy:
+        src: auditd/99-hardening.rules
+        dest: /etc/audit/rules.d/99-hardening.rules
+        mode: '0640'
+      register: audit_rules_deploy
+
+    - name: Restart auditd to load new rules
+      systemd:
+        name: auditd
+        state: restarted
+      when: audit_rules_deploy is changed

@@ -1,0 +1,157 @@
+---
+# Ubuntu equivalent of: https://github.com/trimstray/the-practical-linux-hardening-guide/wiki/Maintaining-Software
+# Covers: Package signatures, Keep system updated, Disable vulnerable software, Enable important software
+
+- name: Maintaining Software (Ubuntu Hardening)
+  hosts: all
+  become: yes
+  vars:
+    # Services to disable (C2S/CIS - reduce attack surface)
+    # Only disables if the service exists; safe to list all
+    services_to_disable:
+      - rlogin.socket
+      - rexec.socket
+      - rsh.socket
+      - tftp.service
+      - xinetd.service
+      - vsftpd.service
+      - avahi-daemon.service
+      - snmpd.service
+      - named.service
+      - smbd.service
+      - nmbd.service
+      - apache2.service
+      - httpd.service
+      - squid.service
+      - isc-dhcp-server.service
+      - dovecot.service
+      - rpcbind.service
+      - nfs-server.service
+      - cups.service
+      - cups-browsed.service
+
+  tasks:
+    # ==========================================================================
+    # Package signatures (C2S/CIS CCE-26989-4)
+    # APT verifies packages by default; ensure no insecure overrides
+    # ==========================================================================
+    - name: Configure APT security hardening (no insecure repos)
+      copy:
+        dest: /etc/apt/apt.conf.d/99-security-hardening
+        content: |
+          APT::Get::AllowInsecureRepositories "false";
+          APT::Get::AllowDowngradeToInsecureRepositories "false";
+          APT::Get::AllowUnauthenticated "false";
+        mode: '0644'
+
+    # ==========================================================================
+    # Keep system updated (C2S/CIS CCE-26895-3)
+    # ==========================================================================
+    - name: Update apt cache
+      apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Upgrade all packages (security updates)
+      apt:
+        upgrade: safe
+        autoremove: true
+        autoclean: true
+
+    # ==========================================================================
+    # Disable vulnerable software (C2S/CIS)
+    # Remove/disable legacy unencrypted and unnecessary services
+    # ==========================================================================
+
+    # Remove legacy R-services (rsh, rlogin, rcp - unencrypted)
+    - name: Remove rsh and related legacy clients
+      apt:
+        name:
+          - rsh-client
+          - rsh-server
+          - netkit-rsh
+        state: absent
+
+    # Remove trust files used with R-services
+    - name: Remove R-services trust files
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/hosts.equiv
+        - /root/.rhosts
+      ignore_errors: true
+
+    # Remove other vulnerable/unnecessary packages (DevSec package-09: prelink)
+    - name: Remove vulnerable and unnecessary packages
+      apt:
+        name:
+          - telnetd
+          - inetutils-telnetd
+          - tftpd-hpa
+          - atftpd
+          - xinetd
+          - talk
+          - talkd
+          - inetutils-talk
+          - inetutils-talkd
+          - vsftpd
+          - nis
+          - yp-tools
+          - openldap-servers
+          - prelink
+        state: absent
+
+    # Disable services (only if they exist)
+    - name: Disable unnecessary network services
+      systemd:
+        name: "{{ item }}"
+        enabled: false
+        daemon_reload: true
+      loop: "{{ services_to_disable }}"
+      ignore_errors: true
+      register: disable_services
+      failed_when: false
+
+    # ==========================================================================
+    # Enable important software (C2S/CIS)
+    # ==========================================================================
+
+    # TCP Wrappers for access control (C2S/CIS CCE-27361-5)
+    - name: Install TCP Wrappers
+      apt:
+        name: tcpd
+        state: present
+
+    # Cron for maintenance tasks (C2S/CIS CCE-27323-5)
+    - name: Ensure cron is installed and enabled
+      apt:
+        name: cron
+        state: present
+
+    - name: Enable cron service
+      systemd:
+        name: cron
+        enabled: true
+        state: started
+
+    # Time synchronization (C2S/CIS CCE-27444-9)
+    # Ubuntu uses systemd-timesyncd by default; chrony is an alternative
+    - name: Ensure time synchronization is enabled
+      block:
+        - name: Install chrony for NTP
+          apt:
+            name: chrony
+            state: present
+
+        - name: Enable and start chronyd
+          systemd:
+            name: chrony
+            enabled: true
+            state: started
+      rescue:
+        - name: Fallback - enable systemd-timesyncd
+          systemd:
+            name: systemd-timesyncd
+            enabled: true
+            state: started

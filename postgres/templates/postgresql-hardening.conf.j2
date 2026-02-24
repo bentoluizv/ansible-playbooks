@@ -1,0 +1,19 @@
+# DevSec Postgres Baseline: https://dev-sec.io/baselines/postgres/
+# Place in conf.d/ - Ubuntu includes conf.d/*.conf automatically
+
+# Logging (postgres-16)
+logging_collector = on
+log_directory = 'pg_log'
+log_connections = on
+log_disconnections = on
+log_duration = on
+log_hostname = on
+log_line_prefix = '%t %u %d %h'
+
+# Password encryption (postgres-07)
+password_encryption = scram-sha-256
+{% if postgres_ssl_enable | default(false) | bool %}
+# SSL (postgres-11, postgres-12) - requires server.crt and server.key in data dir
+ssl = on
+ssl_ciphers = 'ALL:!ADH:!LOW:!EXP:!MD5:@STRENGTH'
+{% endif %}

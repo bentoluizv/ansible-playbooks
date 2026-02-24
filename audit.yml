@@ -1,0 +1,169 @@
+---
+# Security audits (filesystem scans can be slow)
+# Run separately: ansible-playbook audit.yml
+# DevSec Linux Baseline: https://dev-sec.io/baselines/linux/
+
+- name: DevSec OS Audits
+  hosts: all
+  become: yes
+
+  tasks:
+    # DevSec os-09: No .rhosts or .netrc files
+    - name: Check for .rhosts and .netrc files (DevSec os-09)
+      command: find / -maxdepth 3 \( -iname .rhosts -o -iname .netrc \) -print 2>/dev/null
+      register: rhosts_netrc
+      changed_when: false
+      failed_when: (rhosts_netrc.stdout_lines | default([]) | length) > 0
+      ignore_errors: true
+
+    - name: Alert on .rhosts or .netrc files
+      debug:
+        msg: "DevSec os-09: Found .rhosts or .netrc - {{ rhosts_netrc.stdout_lines | default([]) }}"
+      when: (rhosts_netrc.stdout_lines | default([]) | length) > 0
+
+    # DevSec os-07: Unique UID/GID
+    - name: Check for duplicate UIDs (DevSec os-07)
+      shell: "awk -F: '{print $3}' /etc/passwd | sort -n | uniq -d"
+      register: dup_uids
+      changed_when: false
+      failed_when: dup_uids.stdout | length > 0
+      ignore_errors: true
+
+    - name: Check for duplicate GIDs (DevSec os-07)
+      shell: "awk -F: '{print $3}' /etc/group | sort -n | uniq -d"
+      register: dup_gids
+      changed_when: false
+      failed_when: dup_gids.stdout | length > 0
+      ignore_errors: true
+
+    # DevSec os-10: dev-sec.conf exists
+    - name: Verify dev-sec.conf filesystem blacklist (DevSec os-10)
+      command: grep -q 'install cramfs /bin/true' /etc/modprobe.d/dev-sec.conf
+      register: devsec_conf_check
+      changed_when: false
+      failed_when: devsec_conf_check.rc != 0
+      ignore_errors: true
+
+- name: PAM Configuration Audit
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: Verify faillock is configured in common-auth
+      command: grep -q 'pam_faillock.so preauth' /etc/pam.d/common-auth
+      register: pam_faillock_check
+      changed_when: false
+      failed_when: pam_faillock_check.rc != 0
+
+    - name: Verify pam_pwquality in common-password
+      command: grep -q 'pam_pwquality' /etc/pam.d/common-password
+      register: pam_pwquality_check
+      changed_when: false
+      failed_when: pam_pwquality_check.rc != 0
+
+    - name: Verify SHA512 in login.defs
+      command: grep -q '^ENCRYPT_METHOD SHA512' /etc/login.defs
+      register: pam_encrypt_check
+      changed_when: false
+      failed_when: pam_encrypt_check.rc != 0
+
+    - name: Verify password remember in common-password
+      command: grep -q 'pam_unix.*remember=' /etc/pam.d/common-password
+      register: pam_remember_check
+      changed_when: false
+      failed_when: pam_remember_check.rc != 0
+
+- name: AppArmor Configuration Audit
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: Verify AppArmor is not disabled in grub
+      command: grep -q 'apparmor=0' /etc/default/grub
+      register: apparmor_grub_check
+      changed_when: false
+      failed_when: apparmor_grub_check.rc == 0
+
+    - name: Verify AppArmor service is active
+      command: systemctl is-active apparmor
+      register: apparmor_service_check
+      changed_when: false
+      failed_when: apparmor_service_check.stdout != 'active'
+
+- name: Auditd Configuration Audit
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: Verify audit=1 in grub
+      command: grep -q 'audit=1' /etc/default/grub
+      register: audit_grub_check
+      changed_when: false
+      failed_when: audit_grub_check.rc != 0
+
+    - name: Verify auditd service is active
+      command: systemctl is-active auditd
+      register: auditd_service_check
+      changed_when: false
+      failed_when: auditd_service_check.stdout != 'active'
+
+    - name: Verify audit rules are loaded
+      command: auditctl -l
+      register: audit_rules_check
+      changed_when: false
+      failed_when: audit_rules_check.rc != 0
+
+- name: Permission and Ownership Audits
+  hosts: all
+  become: yes
+
+  tasks:
+    # CCE-80134-0, CCE-80135-7
+    - name: Check for files not owned by any user
+      command: find / -xdev -nouser 2>/dev/null
+      register: unowned_files
+      changed_when: false
+      failed_when: (unowned_files.stdout_lines | default([]) | length) > 0
+      ignore_errors: true
+
+    - name: Alert on unowned files
+      debug:
+        msg: "Security: Found {{ unowned_files.stdout_lines | default([]) | length }} file(s) not owned by any user. Investigate: find / -xdev -nouser"
+      when: (unowned_files.stdout_lines | default([]) | length) > 0
+
+    - name: Check for files not owned by any group
+      command: find / -xdev -nogroup 2>/dev/null
+      register: ungrouped_files
+      changed_when: false
+      failed_when: (ungrouped_files.stdout_lines | default([]) | length) > 0
+      ignore_errors: true
+
+    - name: Alert on ungrouped files
+      debug:
+        msg: "Security: Found {{ ungrouped_files.stdout_lines | default([]) | length }} file(s) not owned by any group. Investigate: find / -xdev -nogroup"
+      when: (ungrouped_files.stdout_lines | default([]) | length) > 0
+
+    # CCE-80131-6
+    - name: Check for world-writable files
+      command: find / -xdev -perm -o+w -type f 2>/dev/null
+      register: world_writable_files
+      changed_when: false
+      failed_when: (world_writable_files.stdout_lines | default([]) | length) > 0
+      ignore_errors: true
+
+    - name: Alert on world-writable files
+      debug:
+        msg: "Security: Found {{ world_writable_files.stdout_lines | default([]) | length }} world-writable file(s). Investigate: find / -xdev -perm -o+w -type f"
+      when: (world_writable_files.stdout_lines | default([]) | length) > 0
+
+    # CCE-80130-8 - fix world-writable dirs without sticky bit
+    - name: Find world-writable directories without sticky bit
+      shell: |
+        df --local -P | awk 'NR!=1 {print $6}' | xargs -I '{}' find '{}' -xdev -type d \( -perm -0002 -a ! -perm -1000 \) 2>/dev/null
+      register: sticky_bit_dirs
+      changed_when: false
+
+    - name: Set sticky bit on world-writable directories
+      command: chmod a+t {{ item }}
+      loop: "{{ sticky_bit_dirs.stdout_lines | default([]) }}"
+      when: sticky_bit_dirs.stdout_lines | default([]) | length > 0

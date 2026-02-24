@@ -1,4 +1,7 @@
 ---
+# Install kubectl client
+# Run: ansible-playbook kubernetes/kubectl.yml
+
 - name: Install and Configure kubectl
   hosts: all
   become: yes
