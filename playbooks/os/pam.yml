@@ -86,16 +86,10 @@
         insertbefore: 'account\s+\[success=1 new_authtok_reqd=ignore default=ignore\].*pam_unix'
         state: present
 
-    - name: Remove existing remember from pam_unix line
+    - name: Set remember on pam_unix in common-password
       replace:
         path: /etc/pam.d/common-password
-        regexp: '\s+remember=\d+'
-        replace: ''
-
-    - name: Add remember to pam_unix in common-password
-      replace:
-        path: /etc/pam.d/common-password
-        regexp: '(password\s+.*pam_unix\.so\s+)(.*?)(\s*)$'
+        regexp: '(password\s+.*pam_unix\.so\s+)((?:(?!\s+remember=).)*)(\s*)$'
         replace: '\1\2 remember={{ pam_remember }}\3'
 
     - name: Add or update pam_pwquality in common-password
