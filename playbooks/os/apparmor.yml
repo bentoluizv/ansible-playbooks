@@ -7,6 +7,11 @@
   become: yes
 
   tasks:
+    - name: Install AppArmor utilities
+      apt:
+        name: apparmor-utils
+        state: present
+
     - name: Ensure AppArmor service is enabled and started
       systemd:
         name: apparmor
@@ -22,7 +27,8 @@
       shell: aa-enforce /etc/apparmor.d/*
       args:
         executable: /bin/bash
-      changed_when: "'complain' in (apparmor_complain_check.stdout | default(''))"
+      changed_when: >
+        (apparmor_complain_check.stdout | default('')) is match('.*[1-9][0-9]* profiles are in complain mode.*')
 
     - name: Remove apparmor=0 from GRUB
       replace:
@@ -47,4 +53,5 @@
           AppArmor has profiles in complain mode. Review with: apparmor_status
           Consider: aa-enforce /etc/apparmor.d/<profile>
           {{ apparmor_status.stdout | default('') }}
-      when: "'complain' in (apparmor_status.stdout | default(''))"
+      when: >
+        (apparmor_status.stdout | default('')) is match('.*[1-9][0-9]* profiles are in complain mode.*')
