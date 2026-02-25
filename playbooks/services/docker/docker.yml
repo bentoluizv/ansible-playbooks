@@ -58,3 +58,16 @@
         name: docker
         state: started
         enabled: yes
+
+    # Security: require sudo for docker - https://docs.docker.com/engine/security/#docker-daemon-attack-surface
+    - name: Get users in docker group
+      command: getent group docker
+      register: docker_group
+      changed_when: false
+      failed_when: false
+
+    - name: Remove all users from docker group (require sudo for docker)
+      command: "gpasswd -d {{ item }} docker"
+      loop: "{{ ((docker_group.stdout | default('')).split(':') + ['', '', '', ''])[3].split(',') | select | list }}"
+      loop_control:
+        label: "{{ item }}"
