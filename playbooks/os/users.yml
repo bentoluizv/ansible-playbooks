@@ -1,0 +1,69 @@
+---
+- name: Setup Managed Users
+  hosts: all
+  become: yes
+  vars:
+    managed_users:
+      - name: ansible_bot
+        ssh_key_file: "{{ lookup('env', 'HOME') }}/.ssh/ansible_bot.pub"
+        sudo: yes
+      - name: bento
+        ssh_key_file: "{{ lookup('env', 'HOME') }}/.ssh/id_ed25519.pub"
+        sudo: yes
+
+  tasks:
+    - name: Ensure group "sudo" exists
+      group:
+        name: sudo
+        state: present
+
+    - name: Ensure /home directory exists
+      file:
+        path: /home
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Create managed users
+      user:
+        name: "{{ item.name }}"
+        home: "/home/{{ item.name }}"
+        shell: /bin/bash
+        groups: sudo
+        append: yes
+        create_home: yes
+      loop: "{{ managed_users }}"
+      when: item.sudo | default(false) | bool
+
+    - name: Create managed users (no sudo)
+      user:
+        name: "{{ item.name }}"
+        home: "/home/{{ item.name }}"
+        shell: /bin/bash
+        create_home: yes
+      loop: "{{ managed_users }}"
+      when: not (item.sudo | default(false) | bool)
+
+    - name: Set up passwordless sudo for managed users
+      copy:
+        content: "{{ item.name }} ALL=(ALL) NOPASSWD:ALL"
+        dest: "/etc/sudoers.d/{{ item.name }}"
+        mode: '0440'
+        validate: 'visudo -cf %s'
+      loop: "{{ managed_users }}"
+      when: item.sudo | default(false) | bool
+
+    - name: Set authorized key for managed users
+      authorized_key:
+        user: "{{ item.name }}"
+        state: present
+        key: "{{ item.ssh_public_key | default(lookup('file', item.ssh_key_file)) }}"
+      loop: "{{ managed_users }}"
+      when: item.ssh_public_key is defined or item.ssh_key_file is defined
+
+    - name: Remove ubuntu user
+      user:
+        name: ubuntu
+        state: absent
+        remove: yes
