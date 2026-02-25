@@ -1,6 +1,6 @@
 ---
 # OS hardening
-- import_playbook: playbooks/os/ansible_user.yml
+- import_playbook: playbooks/os/users.yml
 - import_playbook: playbooks/os/ssh.yml
 - import_playbook: playbooks/os/maintaining_software.yml
 - import_playbook: playbooks/os/permissions_and_limits.yml
@@ -8,8 +8,4 @@
 - import_playbook: playbooks/os/apparmor.yml
 - import_playbook: playbooks/os/auditd.yml
 - import_playbook: playbooks/os/sysctl.yml
-
-# Kubernetes specific
-- import_playbook: playbooks/services/kubernetes/kubectl.yml
-- import_playbook: playbooks/services/kubernetes/permissions.yml
 

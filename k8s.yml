@@ -1,0 +1,4 @@
+---
+- import_playbook: playbooks/services/kubernetes/kubectl.yml
+- import_playbook: playbooks/services/kubernetes/permissions.yml
+
